@@ -2,24 +2,539 @@
 <html lang="en" dir="ltr" class="hydrated">
   <head>
     <meta charset="UTF-8" />
-    <title>Example Capacitor App</title>
+    <title>Twilio Voice Quickstart</title>
     <meta
       name="viewport"
       content="viewport-fit=cover, width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
     <meta name="format-detection" content="telephone=no" />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background-color: #ffffff;
+        color: #000000;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        padding: 20px;
+      }
+
+      .container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        max-width: 375px;
+        width: 100%;
+        position: relative;
+      }
+
+      .quality-warnings {
+        position: absolute;
+        top: -60px;
+        left: 0;
+        right: 0;
+        height: 18px;
+        font-size: 15px;
+        text-align: center;
+        color: #ff3b30;
+        background-color: rgba(255, 59, 48, 0.1);
+        padding: 4px;
+        border-radius: 8px;
+        display: none;
+        animation: fadeIn 0.3s ease-in-out;
+      }
+
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+
+      .twilio-logo {
+        width: 240px;
+        height: 240px;
+        background: linear-gradient(135deg, #e23e3a 0%, #ff6b6b 100%);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 20px;
+        box-shadow: 0 8px 20px rgba(226, 62, 58, 0.3);
+        animation: logoSpin 0s ease-in-out;
+      }
+
+      @keyframes logoSpin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+
+      .twilio-logo.spinning {
+        animation: logoSpin 0.5s linear infinite;
+      }
+
+      .twilio-logo svg {
+        width: 120px;
+        height: 120px;
+        fill: white;
+      }
+
+      .input-container {
+        width: 240px;
+        margin-bottom: 8px;
+      }
+
+      .phone-input {
+        width: 100%;
+        height: 34px;
+        padding: 8px 12px;
+        border: 1px solid #d1d1d6;
+        border-radius: 8px;
+        font-size: 14px;
+        background-color: #ffffff;
+        outline: none;
+      }
+
+      .phone-input:focus {
+        border-color: #007aff;
+        box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.2);
+      }
+
+      .description {
+        width: 256px;
+        height: 40px;
+        font-size: 11px;
+        color: #8e8e93;
+        text-align: center;
+        line-height: 1.4;
+        margin-bottom: 5px;
+      }
+
+      .call-button {
+        background-color: #007aff;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: 500;
+        cursor: pointer;
+        margin-bottom: 8px;
+        min-width: 80px;
+        transition: all 0.2s ease;
+      }
+
+      .call-button:hover {
+        background-color: #0056cc;
+      }
+
+      .call-button:disabled {
+        background-color: #8e8e93;
+        cursor: not-allowed;
+      }
+
+      .call-button.hang-up {
+        background-color: #ff3b30;
+      }
+
+      .call-button.hang-up:hover {
+        background-color: #d70015;
+      }
+
+      .call-controls {
+        width: 240px;
+        height: 88px;
+        background-color: #f2f2f7;
+        border-radius: 12px;
+        display: none;
+        flex-direction: row;
+        justify-content: space-around;
+        align-items: center;
+        padding: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+
+      .call-controls.visible {
+        display: flex;
+      }
+
+      .control-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .control-switch {
+        width: 48px;
+        height: 28px;
+        border-radius: 14px;
+        background-color: #e5e5ea;
+        position: relative;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+      }
+
+      .control-switch.on {
+        background-color: #34c759;
+      }
+
+      .control-switch::after {
+        content: '';
+        position: absolute;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background-color: white;
+        top: 2px;
+        left: 2px;
+        transition: transform 0.3s ease;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+      }
+
+      .control-switch.on::after {
+        transform: translateX(20px);
+      }
+
+      .control-label {
+        font-size: 12px;
+        color: #3c3c43;
+        font-weight: 500;
+      }
+
+      .status-indicator {
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: #34c759;
+        color: white;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 14px;
+        display: none;
+        z-index: 1000;
+      }
+
+      .status-indicator.visible {
+        display: block;
+        animation: slideDown 0.3s ease-out;
+      }
+
+      @keyframes slideDown {
+        from {
+          transform: translateX(-50%) translateY(-100%);
+          opacity: 0;
+        }
+        to {
+          transform: translateX(-50%) translateY(0);
+          opacity: 1;
+        }
+      }
+
+      .status-indicator.error {
+        background-color: #ff3b30;
+      }
+
+      .status-indicator.info {
+        background-color: #007aff;
+      }
+
+      .call-info {
+        text-align: center;
+        margin: 10px 0;
+        color: #8e8e93;
+        font-size: 14px;
+        min-height: 20px;
+      }
+
+      .login-container {
+        width: 240px;
+        margin-bottom: 20px;
+        padding: 20px;
+        background-color: #f8f9fa;
+        border-radius: 12px;
+        border: 1px solid #e1e5e9;
+      }
+
+      .login-container.hidden {
+        display: none;
+      }
+
+      .call-container {
+        display: none;
+      }
+
+      .call-container.visible {
+        display: block;
+      }
+
+      .logout-button {
+        background-color: #8e8e93;
+        color: white;
+        border: none;
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 400;
+        cursor: pointer;
+        margin-top: 10px;
+        transition: all 0.2s ease;
+      }
+
+      .logout-button:hover {
+        background-color: #636366;
+      }
+
+      .logout-button:disabled {
+        background-color: #d1d1d6;
+        cursor: not-allowed;
+      }
+
+      /* Incoming Call Screen */
+      .incoming-call-screen {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        animation: slideInFromTop 0.3s ease-out;
+      }
+
+      .incoming-call-screen.visible {
+        display: flex;
+      }
+
+      @keyframes slideInFromTop {
+        from {
+          transform: translateY(-100%);
+          opacity: 0;
+        }
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+
+      .incoming-call-content {
+        text-align: center;
+        color: white;
+        max-width: 300px;
+        width: 100%;
+        padding: 40px 20px;
+      }
+
+      .incoming-call-avatar {
+        margin-bottom: 30px;
+      }
+
+      .avatar-circle {
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto;
+        box-shadow: 0 8px 32px rgba(79, 172, 254, 0.3);
+        animation: pulse 2s infinite;
+      }
+
+      @keyframes pulse {
+        0%, 100% {
+          transform: scale(1);
+          box-shadow: 0 8px 32px rgba(79, 172, 254, 0.3);
+        }
+        50% {
+          transform: scale(1.05);
+          box-shadow: 0 12px 40px rgba(79, 172, 254, 0.5);
+        }
+      }
+
+      .avatar-circle svg {
+        width: 60px;
+        height: 60px;
+        color: white;
+      }
+
+      .incoming-call-info {
+        margin-bottom: 50px;
+      }
+
+      .caller-name {
+        font-size: 28px;
+        font-weight: 600;
+        margin-bottom: 8px;
+        color: white;
+      }
+
+      .call-status {
+        font-size: 16px;
+        color: #a0a0a0;
+        font-weight: 400;
+      }
+
+      .incoming-call-actions {
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+        gap: 60px;
+      }
+
+      .call-action-btn {
+        width: 70px;
+        height: 70px;
+        border-radius: 50%;
+        border: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      }
+
+      .call-action-btn:active {
+        transform: scale(0.95);
+      }
+
+      .call-action-btn svg {
+        width: 32px;
+        height: 32px;
+      }
+
+      .reject-btn {
+        background: linear-gradient(135deg, #ff3b30 0%, #d70015 100%);
+        color: white;
+      }
+
+      .reject-btn:hover {
+        background: linear-gradient(135deg, #ff1e0f 0%, #b5000f 100%);
+        box-shadow: 0 6px 25px rgba(255, 59, 48, 0.4);
+      }
+
+      .accept-btn {
+        background: linear-gradient(135deg, #34c759 0%, #28a745 100%);
+        color: white;
+      }
+
+      .accept-btn:hover {
+        background: linear-gradient(135deg, #28c946 0%, #1e7e34 100%);
+        box-shadow: 0 6px 25px rgba(52, 199, 89, 0.4);
+      }
+    </style>
   </head>
   <body>
-    <main>
-      <h1>Capacitor Test Plugin Project</h1>
-      <p>
-        This project can be used to test out the functionality of your plugin. Nothing in the
-        <em>example-app/</em> folder will be published to npm when using this template, so you can create away!
-      </p>
-      <label for="echoInput">Echo Text:</label>
-      <input type="text" id="echoInput" name="echoInput" value="Hello World!" />
-      <button onclick="testEcho()">Click Me!</button>
-    </main>
+    <div class="status-indicator" id="statusIndicator"></div>
+    
+    <!-- Incoming Call Screen -->
+    <div class="incoming-call-screen" id="incomingCallScreen">
+      <div class="incoming-call-content">
+        <div class="incoming-call-avatar">
+          <div class="avatar-circle">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+            </svg>
+          </div>
+        </div>
+        <div class="incoming-call-info">
+          <div class="caller-name" id="callerName">Unknown Caller</div>
+          <div class="call-status">Incoming call...</div>
+        </div>
+        <div class="incoming-call-actions">
+          <button class="call-action-btn reject-btn" id="rejectCallBtn">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08c-.18-.17-.29-.42-.29-.7 0-.28.11-.53.29-.71C3.34 8.78 7.46 7 12 7s8.66 1.78 11.71 4.67c.18.18.29.43.29.71 0 .28-.11.53-.29.7l-2.48 2.48c-.18.18-.43.29-.71.29-.27 0-.52-.1-.7-.28-.79-.73-1.68-1.36-2.66-1.85-.33-.16-.56-.5-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z"/>
+            </svg>
+          </button>
+          <button class="call-action-btn accept-btn" id="acceptCallBtn">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56-.35-.12-.74-.03-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <div class="container">
+      <div class="quality-warnings" id="qualityWarnings">
+        Warnings detected
+      </div>
+
+      <div class="twilio-logo" id="twilioLogo">
+        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="25" cy="25" r="8"/>
+          <circle cx="75" cy="25" r="8"/>
+          <circle cx="25" cy="75" r="8"/>
+          <circle cx="75" cy="75" r="8"/>
+          <circle cx="50" cy="50" r="12"/>
+        </svg>
+      </div>
+
+      <div class="login-container" id="loginContainer">
+        <div class="input-container">
+          <input 
+            type="text" 
+            id="identityInput" 
+            class="phone-input" 
+            placeholder="Enter your identity (e.g., alice, bob)"
+            style="margin-bottom: 8px;"
+            value="alice"
+          />
+        </div>
+        <button id="loginButton" class="call-button">Get Access Token & Login</button>
+        <div class="login-info" style="margin-top: 8px; font-size: 12px; color: #8e8e93; text-align: center;">
+          This will fetch a fresh access token from the Twilio backend
+        </div>
+      </div>
+
+      <div class="call-container" id="callContainer">
+        <div class="input-container">
+          <input 
+            type="text" 
+            id="phoneInput" 
+            class="phone-input" 
+            placeholder="Enter phone number or client name"
+            autocomplete="tel"
+          />
+        </div>
+
+        <div class="description">
+          Dial a client name or phone number. Leaving the field empty results in an automated response.
+        </div>
+
+        <button id="callButton" class="call-button">Call</button>
+
+        <div class="call-info" id="callInfo"></div>
+
+        <button id="logoutButton" class="logout-button">Logout</button>
+
+        <div class="call-controls" id="callControls">
+          <div class="control-item">
+            <div class="control-switch" id="muteSwitch">
+            </div>
+            <div class="control-label">Mute</div>
+          </div>
+          <div class="control-item">
+            <div class="control-switch on" id="speakerSwitch">
+            </div>
+            <div class="control-label">Speaker</div>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <script src="./js/example.js" type="module"></script>
   </body>

@@ -10,16 +10,23 @@ let package = Package(
             targets: ["CapacitorTwilioVoicePlugin"])
     ],
     dependencies: [
-        .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", from: "7.0.0")
+        .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", from: "7.0.0"),
+        .package(url: "https://github.com/twilio/twilio-voice-ios", from: "6.13.0")
     ],
     targets: [
         .target(
             name: "CapacitorTwilioVoicePlugin",
             dependencies: [
                 .product(name: "Capacitor", package: "capacitor-swift-pm"),
-                .product(name: "Cordova", package: "capacitor-swift-pm")
+                .product(name: "Cordova", package: "capacitor-swift-pm"),
+                .product(name: "TwilioVoice", package: "twilio-voice-ios")
             ],
-            path: "ios/Sources/CapacitorTwilioVoicePlugin"),
+            path: "ios/Sources/CapacitorTwilioVoicePlugin",
+            linkerSettings: [
+                .linkedFramework("PushKit"),
+                .linkedFramework("CallKit"),
+                .linkedFramework("AVFoundation")
+            ]),
         .testTarget(
             name: "CapacitorTwilioVoicePluginTests",
             dependencies: ["CapacitorTwilioVoicePlugin"],
