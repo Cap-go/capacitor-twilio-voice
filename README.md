@@ -1,6 +1,6 @@
-# @capgo/capacitor-twilio-voice
+## Capacitor Twilio Voice Plugin
 
-Capacitor plugin for Twilio Voice SDK
+A Capacitor plugin for integrating Twilio Voice calling functionality into iOS and Android applications.
 
 ## Installation
 
@@ -9,73 +9,106 @@ npm install @capgo/capacitor-twilio-voice
 npx cap sync
 ```
 
-## Authentication
+## iOS Setup
 
-This plugin uses a login-based authentication system where you provide Twilio access tokens at runtime. The plugin automatically validates JWT tokens and handles token expiration.
+### 1. Install Dependencies
 
-### Backend Integration
+#### Option A: CocoaPods (Recommended)
+Add to your app's `ios/App/Podfile`:
+```ruby
+pod 'TwilioVoice', '~> 6.13'
+```
 
-The example app demonstrates how to integrate with a Twilio backend server to fetch access tokens dynamically. The included Java backend at [https://twilio-backend-82.localcan.dev](https://twilio-backend-82.localcan.dev) provides:
+#### Option B: Swift Package Manager  
+Add to your `Package.swift`:
+```swift
+dependencies: [
+    .package(url: "https://github.com/twilio/twilio-voice-ios", from: "6.13.0")
+]
+```
 
-- `/accessToken?identity=alice` - Returns a fresh JWT access token for the specified identity
-- CORS support for web applications
-- TwiML endpoints for call handling
+### 2. Configure Info.plist
+Add to `ios/App/App/Info.plist`:
+```xml
+<key>NSMicrophoneUsageDescription</key>
+<string>This app uses the microphone for voice calls</string>
+
+<key>UIBackgroundModes</key>
+<array>
+    <string>voip</string>
+    <string>audio</string>
+</array>
+```
+
+### 3. Enable Push Notifications Capability
+In Xcode, select your app target → Signing & Capabilities → Add Capability → Push Notifications
+
+### 4. PushKit Setup
+PushKit is automatically configured by the plugin. No additional setup required.
+
+## Android Setup
+
+### 1. Firebase Setup
+Add Firebase to your Android project:
+
+1. Add `google-services.json` to `android/app/`
+2. Update `android/app/build.gradle`:
+```gradle
+apply plugin: 'com.google.gms.google-services'
+
+dependencies {
+    // ... existing dependencies
+    implementation 'com.google.firebase:firebase-messaging:25.0.0'
+    implementation platform('com.google.firebase:firebase-bom:34.0.0')
+    implementation 'com.twilio:audioswitch:1.2.2'
+    implementation 'androidx.core:core:1.13.1'
+    implementation 'androidx.media:media:1.6.0'
+}
+```
+
+3. Update project-level `android/build.gradle`:
+```gradle
+buildscript {
+    dependencies {
+        classpath 'com.google.gms:google-services:4.4.2'
+    }
+}
+```
+
+### 2. AndroidManifest.xml
+Required permissions are automatically added by the plugin:
+- `RECORD_AUDIO`
+- `INTERNET` 
+- `ACCESS_NETWORK_STATE`
+- `WAKE_LOCK`
+- `USE_FULL_SCREEN_INTENT`
+- `VIBRATE`
+- `SYSTEM_ALERT_WINDOW`
+- `FOREGROUND_SERVICE`
+
+### 3. Firebase Messaging Service
+The plugin automatically registers a Firebase Messaging Service to handle incoming calls.
+
+### 4. Android Notification Features 📱
+The Android implementation includes comprehensive notification support:
+
+- **🔔 System Notifications**: Incoming calls appear as proper Android notifications with caller information
+- **📱 Full-Screen Intent**: Calls can launch the app on lock screen for immediate visibility
+- **🎵 Ringtone & Vibration**: Uses system default ringtone with vibration pattern for audio/haptic alerts
+- **⚡ Action Buttons**: Accept/Reject buttons directly in notification for quick response
+- **🔕 Auto-Dismiss**: Notifications automatically clear when calls end or are answered
+- **🌙 Do Not Disturb**: Respects system notification settings and priority modes
+
+**Note**: Notification functionality requires notification permissions. The app will request these permissions during login if not already granted.
 
 ## Usage
 
-### Option 1: Direct Token Usage
-```typescript
-import { CapacitorTwilioVoice } from '@capgo/capacitor-twilio-voice';
-
-// Login with your Twilio access token
-await CapacitorTwilioVoice.login({ 
-  accessToken: 'YOUR_TWILIO_JWT_ACCESS_TOKEN' 
-});
-```
-
-### Option 2: Backend Integration (Recommended)
-```typescript
-// Fetch token from your backend
-async function fetchAccessToken(identity) {
-  const response = await fetch(`${BACKEND_URL}/accessToken?identity=${identity}`);
-  return await response.text();
-}
-
-// Login with fetched token
-const accessToken = await fetchAccessToken('alice');
-await CapacitorTwilioVoice.login({ accessToken });
-
-// Make a call
-const { callSid } = await CapacitorTwilioVoice.makeCall({ to: '+1234567890' });
-
-// Logout when done
-await CapacitorTwilioVoice.logout();
-
-// Listen for incoming calls
-CapacitorTwilioVoice.addListener('callInviteReceived', (data) => {
-  console.log('Incoming call from:', data.from);
-  // Accept or reject the call
-  await CapacitorTwilioVoice.acceptCall({ callSid: data.callSid });
-});
-
-// Listen for call state changes
-CapacitorTwilioVoice.addListener('callConnected', (data) => {
-  console.log('Call connected:', data.callSid);
-});
-
-CapacitorTwilioVoice.addListener('callDisconnected', (data) => {
-  console.log('Call ended:', data.callSid);
-});
-```
-
-## API
-
-### Methods
+### Authentication
 
 #### `login(options: { accessToken: string })`
-Authenticates with Twilio using a JWT access token. The plugin automatically:
-- Validates the JWT format and expiration
-- Stores the token securely for reuse
+Authenticates with Twilio using a JWT access token:
+- Validates token expiration automatically
+- Stores token securely for app restarts  
 - Registers for VoIP push notifications
 - **Note**: The plugin will reject expired tokens
 
@@ -85,6 +118,12 @@ Logs out the current user and cleans up all session data:
 - Clears stored access tokens
 - Ends any active calls
 - Resets all call state
+
+#### `isLoggedIn()`
+Checks if user is currently logged in with a valid (non-expired) token.
+Returns: `{ isLoggedIn: boolean, hasValidToken: boolean, identity?: string }`
+
+The `identity` field contains the user identity extracted from the JWT token if logged in.
 
 #### `makeCall(options: { to: string })`
 Initiates an outgoing call. Requires prior authentication via `login()`.
@@ -102,7 +141,7 @@ Ends the active call or a specific call.
 Mutes or unmutes the microphone.
 
 #### `setSpeaker(options: { enabled: boolean })`
-Enables or disables the speaker.
+Enables or disables the speaker. On Android, uses Twilio AudioSwitch to manage audio routing between earpiece, speaker, and connected devices (headsets, Bluetooth, etc.).
 
 #### `getCallStatus()`
 Gets the current call status.
@@ -111,99 +150,125 @@ Gets the current call status.
 Checks if microphone permission is granted.
 
 #### `requestMicrophonePermission()`
-Requests microphone permission.
+Requests microphone permission from the user.
 
-### Events
+### Event Listeners
 
-- `callInviteReceived` - Incoming call received
-- `callConnected` - Call connected
-- `callDisconnected` - Call ended
-- `callRinging` - Outgoing call is ringing
-- `callReconnecting` - Call is reconnecting
-- `callReconnected` - Call reconnected
-- `callQualityWarningsChanged` - Call quality warnings
-- `registrationSuccess` - Successfully registered for VoIP
-- `registrationFailure` - Failed to register for VoIP
+```typescript
+import { CapacitorTwilioVoice } from '@capgo/capacitor-twilio-voice';
+
+// Registration events
+CapacitorTwilioVoice.addListener('registrationSuccess', (data) => {
+  console.log('Successfully registered:', data);
+});
+
+CapacitorTwilioVoice.addListener('registrationFailure', (data) => {
+  console.error('Registration failed:', data);
+});
+
+// Call events
+CapacitorTwilioVoice.addListener('callInviteReceived', (data) => {
+  console.log('Incoming call from:', data.from);
+});
+
+CapacitorTwilioVoice.addListener('callConnected', (data) => {
+  console.log('Call connected:', data);
+});
+
+CapacitorTwilioVoice.addListener('callDisconnected', (data) => {
+  console.log('Call ended:', data);
+});
+
+CapacitorTwilioVoice.addListener('callRinging', (data) => {
+  console.log('Call is ringing:', data);
+});
+
+CapacitorTwilioVoice.addListener('callReconnecting', (data) => {
+  console.log('Call reconnecting:', data);
+});
+
+CapacitorTwilioVoice.addListener('callReconnected', (data) => {
+  console.log('Call reconnected:', data);
+});
+
+CapacitorTwilioVoice.addListener('callQualityWarningsChanged', (data) => {
+  console.log('Quality warnings:', data);
+});
+```
 
 ## JWT Token Management
 
-The plugin automatically handles JWT token validation and expiration:
-
-- **Validation**: Tokens are validated on login and before each operation
-- **Expiration**: Expired tokens are automatically rejected
-- **Storage**: Valid tokens are stored persistently using UserDefaults
-- **Reuse**: Stored tokens are automatically loaded on app restart (if still valid)
-
-### Token Requirements
-
-Your Twilio JWT access token must:
-- Be properly formatted (3 parts separated by dots)
-- Contain a valid `exp` (expiration) claim
-- Not be expired at the time of use
-
-## iOS Setup
-
-### 1. Add Required Permissions
-Add the following to your `Info.plist`:
-
-```xml
-<key>NSMicrophoneUsageDescription</key>
-<string>This app uses the microphone to make and receive voice calls through Twilio Voice.</string>
-
-<key>UIBackgroundModes</key>
-<array>
-    <string>voip</string>
-</array>
+### Token Format
+The plugin expects Twilio access tokens in JWT format with this structure:
+```json
+{
+  "iss": "your-account-sid",
+  "exp": 1234567890,
+  "grants": {
+    "voice": {
+      "outgoing": {
+        "application_sid": "your-app-sid"
+      },
+      "push_credential_sid": "your-push-credential-sid"
+    },
+    "identity": "user-identity"
+  }
+}
 ```
 
-### 2. Push Notifications Entitlement
-Ensure your app has the Push Notifications capability enabled in Xcode.
+### Token Validation
+- Tokens are automatically validated for expiration
+- Invalid or expired tokens will be rejected
+- Use `isLoggedIn()` to check token status
 
-### 3. VoIP Push Certificate
-Set up VoIP push notifications in your Apple Developer account and configure your Twilio application accordingly.
+### Backend Integration
+Fetch access tokens from your backend server:
+```typescript
+async function fetchAccessToken(identity: string): Promise<string> {
+  const response = await fetch(`/accessToken?identity=${identity}`);
+  return response.text();
+}
+```
+
+## Testing Requirements
+
+### iOS Simulator Limitations
+- VoIP push notifications don't work in the iOS Simulator
+- Use a physical iOS device for testing incoming calls
+- Outgoing calls work in both Simulator and device
+
+### Android Emulator
+- Requires Google Play Services
+- Firebase messaging works in Android Emulator with Google APIs
 
 ## Error Handling
 
-The plugin provides comprehensive error handling:
-
+The plugin provides detailed error information:
 ```typescript
-try {
-  await CapacitorTwilioVoice.login({ accessToken: 'your-token' });
-} catch (error) {
-  if (error.message.includes('expired')) {
-    // Token is expired, get a new one
-    console.log('Token expired, please refresh');
-  } else if (error.message.includes('Invalid')) {
-    // Token format is invalid
-    console.log('Invalid token format');
-  }
-}
-
 try {
   await CapacitorTwilioVoice.makeCall({ to: '+1234567890' });
 } catch (error) {
-  if (error.message.includes('No access token')) {
-    // Need to login first
-    console.log('Please login first');
-  } else if (error.message.includes('expired')) {
-    // Token expired during operation
-    console.log('Token expired, please login again');
-  }
+  console.error('Call failed:', error);
 }
 ```
 
+Common error scenarios:
+- **Invalid token**: Check token format and expiration
+- **No microphone permission**: Call `requestMicrophonePermission()`
+- **Network issues**: Verify internet connectivity
+- **Invalid phone number**: Use E.164 format (+1234567890)
+
 ## Security Notes
 
-- Access tokens are stored in UserDefaults (not encrypted)
-- Tokens are validated client-side for expiration
-- Always use HTTPS when transmitting tokens
-- Implement token refresh logic in your application
-- Consider the security implications of your token storage strategy
+- Access tokens are stored in secure device storage
+- Tokens are automatically validated before use
+- No sensitive data is logged in production builds
+- Always use HTTPS for token fetching from your backend
 
-## Android Support
+## Platform Support
 
-⚠️ **Note**: This plugin currently supports iOS only. Android support is planned for future releases.
-
-## License
-
-MIT
+| Platform | Support | Notes |
+|----------|---------|-------|
+| iOS      | ✅      | Requires iOS 13.0+ |
+| Android  | ✅      | Requires API level 23+ |
+| Web      | ❌      | Not supported |

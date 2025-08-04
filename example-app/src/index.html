@@ -275,6 +275,21 @@
         display: block;
       }
 
+      .user-info {
+        text-align: center;
+        margin-bottom: 20px;
+        padding: 10px;
+        background-color: #e8f5e8;
+        border-radius: 8px;
+        border: 1px solid #b8e6b8;
+      }
+
+      .user-identity {
+        font-size: 16px;
+        font-weight: 600;
+        color: #34c759;
+      }
+
       .logout-button {
         background-color: #8e8e93;
         color: white;
@@ -501,6 +516,10 @@
       </div>
 
       <div class="call-container" id="callContainer">
+        <div class="user-info">
+          <div class="user-identity" id="userIdentity">Not logged in</div>
+        </div>
+        
         <div class="input-container">
           <input 
             type="text" 
@@ -528,7 +547,7 @@
             <div class="control-label">Mute</div>
           </div>
           <div class="control-item">
-            <div class="control-switch on" id="speakerSwitch">
+            <div class="control-switch" id="speakerSwitch">
             </div>
             <div class="control-label">Speaker</div>
           </div>

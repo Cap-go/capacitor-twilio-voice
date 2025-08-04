@@ -1,11 +1,13 @@
 import { CapacitorTwilioVoice } from '@capgo/capacitor-twilio-voice';
+import { Capacitor } from '@capacitor/core';
+import { LocalNotifications } from '@capacitor/local-notifications';
 
 class TwilioVoiceApp {
   constructor() {
     this.currentCallSid = null;
     this.isCallActive = false;
     this.isMuted = false;
-    this.isSpeakerOn = true;
+    this.isSpeakerOn = false;
     this.isConnecting = false;
     this.isLoggedIn = false;
     this.currentIdentity = null;
@@ -14,6 +16,7 @@ class TwilioVoiceApp {
     this.initializeElements();
     this.setupEventListeners();
     this.setupPluginListeners();
+    this.checkLoginStatus();
     this.updateUI();
   }
 
@@ -38,6 +41,9 @@ class TwilioVoiceApp {
     this.callerName = document.getElementById('callerName');
     this.acceptCallBtn = document.getElementById('acceptCallBtn');
     this.rejectCallBtn = document.getElementById('rejectCallBtn');
+    
+    // User identity element
+    this.userIdentity = document.getElementById('userIdentity');
   }
 
   setupEventListeners() {
@@ -142,11 +148,158 @@ class TwilioVoiceApp {
     }
   }
 
+  async checkLoginStatus() {
+    try {
+      const result = await CapacitorTwilioVoice.isLoggedIn();
+             if (result.isLoggedIn) {
+         console.log('User is already logged in with valid token');
+                  this.isLoggedIn = true;
+          this.currentIdentity = result.identity || 'Unknown';
+          this.showStatus(`Already logged in as ${this.currentIdentity}`, 'success');
+          this.updateUserIdentityDisplay();
+          this.showCallContainer();
+       } else {
+        console.log('User is not logged in or token expired');
+        this.isLoggedIn = false;
+        this.showLoginContainer();
+      }
+    } catch (error) {
+      console.error('Error checking login status:', error);
+      this.isLoggedIn = false;
+      this.showLoginContainer();
+    }
+  }
+
+  showLoginContainer() {
+    this.loginContainer.style.display = 'block';
+    this.callContainer.style.display = 'none';
+    this.logoutButton.style.display = 'none';
+  }
+
+  showCallContainer() {
+    this.loginContainer.style.display = 'none';
+    this.callContainer.style.display = 'block';
+    this.logoutButton.style.display = 'block';
+  }
+
+  updateUserIdentityDisplay() {
+    if (this.userIdentity) {
+      if (this.isLoggedIn && this.currentIdentity) {
+        this.userIdentity.textContent = `Logged in as: ${this.currentIdentity}`;
+      } else {
+        this.userIdentity.textContent = 'Not logged in';
+      }
+    }
+  }
+
+  async checkNotificationPermissions() {
+    // Only check on native platforms
+    if (Capacitor.getPlatform() === 'web' || Capacitor.getPlatform() === 'ios') {
+      return;
+    }
+
+    try {
+      // Check current permission status
+      const permission = await LocalNotifications.checkPermissions();
+      console.log('Current notification permission:', permission.display);
+
+      if (permission.display !== 'granted') {
+        // Request permission
+        console.log('Requesting notification permission...');
+        this.showStatus('Requesting notification permission...', 'info');
+        
+        const result = await LocalNotifications.requestPermissions();
+        console.log('Permission request result:', result.display);
+        
+        if (result.display === 'granted') {
+          this.showStatus('Notification permission granted', 'success');
+        } else {
+          // Permission denied - show warning but continue login
+          this.showNotificationPermissionWarning();
+        }
+      } else {
+        console.log('Notification permission already granted');
+      }
+    } catch (error) {
+      console.error('Error checking notification permissions:', error);
+      // Don't fail login due to permission issues
+      this.showNotificationPermissionWarning();
+    }
+  }
+
+  showNotificationPermissionWarning() {
+    // Create and show warning dialog
+    const warningDialog = document.createElement('div');
+    warningDialog.innerHTML = `
+      <div style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+      ">
+        <div style="
+          background: white;
+          padding: 24px;
+          border-radius: 12px;
+          max-width: 90%;
+          width: 400px;
+          text-align: center;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        ">
+          <h3 style="margin: 0 0 16px 0; color: #ff6b35;">⚠️ Notification Permission</h3>
+          <p style="margin: 0 0 20px 0; color: #666; line-height: 1.5;">
+            Notification permission was not granted. You may not receive incoming call notifications when the app is in the background.
+          </p>
+          <p style="margin: 0 0 20px 0; color: #666; font-size: 14px;">
+            You can enable notifications later in your device settings.
+          </p>
+          <button id="dismissWarning" style="
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            min-width: 100px;
+          ">OK</button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(warningDialog);
+    
+    // Handle dismiss
+    const dismissButton = warningDialog.querySelector('#dismissWarning');
+    dismissButton.addEventListener('click', () => {
+      document.body.removeChild(warningDialog);
+    });
+    
+    // Auto-dismiss after 10 seconds
+    setTimeout(() => {
+      if (document.body.contains(warningDialog)) {
+        document.body.removeChild(warningDialog);
+      }
+    }, 10000);
+    
+    this.showStatus('Login successful - notification permission not granted', 'info');
+  }
+
   async fetchAccessToken(identity) {
     const backendUrl = 'https://twilio-backend-82.localcan.dev';
     
+    // Detect platform dynamically
+    const platform = Capacitor.getPlatform(); // 'ios', 'android', or 'web'
+    const platformEndpoint = platform === 'ios' ? 'ios' : 'android'; // default to android for web/unknown
+    
     try {
-      const response = await fetch(`${backendUrl}/accessToken?identity=${encodeURIComponent(identity)}`, {
+      const response = await fetch(`${backendUrl}/accessToken/${platformEndpoint}?identity=${encodeURIComponent(identity)}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -185,9 +338,14 @@ class TwilioVoiceApp {
       const result = await CapacitorTwilioVoice.login({ accessToken });
       
       if (result.success) {
+        // Check and request notification permissions after successful login
+        await this.checkNotificationPermissions();
+        
         this.isLoggedIn = true;
         this.currentIdentity = identity;
         this.showStatus(`Successfully logged in as ${identity}`, 'success');
+        this.updateUserIdentityDisplay();
+        this.showCallContainer();
         this.updateUI();
       } else {
         throw new Error('Login failed');
@@ -222,7 +380,8 @@ class TwilioVoiceApp {
         this.isCallActive = false;
         this.isConnecting = false;
         this.isMuted = false;
-        this.isSpeakerOn = true;
+        this.isSpeakerOn = false;
+        this.updateUserIdentityDisplay();
         
         // Reset UI
         this.stopSpinning();
@@ -230,6 +389,7 @@ class TwilioVoiceApp {
         this.callControls.classList.remove('visible');
         this.callInfo.textContent = '';
         this.hideIncomingCallScreen();
+        this.showLoginContainer();
         this.updateUI();
         
         this.showStatus('Successfully logged out', 'success');
@@ -378,12 +538,19 @@ class TwilioVoiceApp {
     this.isConnecting = false;
     this.currentCallSid = data.callSid;
     
+    // Hide incoming call screen if it's visible (in case call was accepted from notification)
+    this.hideIncomingCallScreen();
+    
     this.stopSpinning();
     this.callButton.textContent = 'Hang Up';
     this.callButton.classList.add('hang-up');
     this.callButton.disabled = false;
     this.callInfo.textContent = `Connected as ${this.currentIdentity}`;
     this.callControls.classList.add('visible');
+    
+    // Sync UI switches with JavaScript state
+    this.muteSwitch.classList.toggle('on', this.isMuted);
+    this.speakerSwitch.classList.toggle('on', this.isSpeakerOn);
     
     this.showStatus('Call connected', 'success');
   }
@@ -393,10 +560,18 @@ class TwilioVoiceApp {
     this.isConnecting = false;
     this.currentCallSid = null;
     
+    // Reset call controls to defaults for next call
+    this.isMuted = false;
+    this.isSpeakerOn = false;
+    
     this.stopSpinning();
     this.resetCallButton();
     this.callControls.classList.remove('visible');
     this.callInfo.textContent = '';
+    
+    // Reset control switches to default state
+    this.muteSwitch.classList.remove('on');
+    this.speakerSwitch.classList.remove('on');
     
     // Hide incoming call screen if it's visible
     this.hideIncomingCallScreen();
@@ -528,9 +703,11 @@ window.login = (identity) => {
 window.logout = () => window.twilioApp?.handleLogout();
 window.fetchToken = (identity) => window.twilioApp?.fetchAccessToken(identity || 'alice');
 window.getCallStatus = () => window.twilioApp?.getCallStatus();
+window.checkLogin = () => window.twilioApp?.checkLoginStatus();
 window.endCall = () => window.twilioApp?.endCall();
 window.toggleMute = () => window.twilioApp?.toggleMute();
 window.toggleSpeaker = () => window.twilioApp?.toggleSpeaker();
+window.checkNotificationPermission = () => window.twilioApp?.checkNotificationPermissions();
 
 // Debug incoming call UI
 window.showIncomingCall = (callerName = 'Test Caller') => {

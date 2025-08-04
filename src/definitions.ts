@@ -2,6 +2,7 @@ export interface CapacitorTwilioVoicePlugin {
   // Authentication
   login(options: { accessToken: string }): Promise<{ success: boolean }>;
   logout(): Promise<{ success: boolean }>;
+  isLoggedIn(): Promise<{ isLoggedIn: boolean, hasValidToken: boolean, identity?: string }>;
   
   // Call Management
   makeCall(options: { to: string }): Promise<{ success: boolean, callSid?: string }>;

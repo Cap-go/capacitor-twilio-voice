@@ -1,0 +1,45 @@
+diff --git a/node_modules/@capacitor/android/capacitor/src/main/java/com/getcapacitor/PluginHandle.java b/node_modules/@capacitor/android/capacitor/src/main/java/com/getcapacitor/PluginHandle.java
+index bfdd922..7c064d6 100644
+--- a/node_modules/@capacitor/android/capacitor/src/main/java/com/getcapacitor/PluginHandle.java
++++ b/node_modules/@capacitor/android/capacitor/src/main/java/com/getcapacitor/PluginHandle.java
+@@ -1,6 +1,8 @@
+ package com.getcapacitor;
+ 
+ import com.getcapacitor.annotation.CapacitorPlugin;
++
++import java.lang.reflect.Field;
+ import java.lang.reflect.InvocationTargetException;
+ import java.lang.reflect.Method;
+ import java.util.Collection;
+@@ -96,6 +98,31 @@ public class PluginHandle {
+     }
+ 
+     public Plugin load() throws PluginLoadException {
++        if (this.pluginClass.getName().equals("ee.forgr.capacitor_twilio_voice.CapacitorTwilioVoicePlugin")) {
++            try {
++                Field instanceField = this.pluginClass.getDeclaredField("instance");
++                instanceField.setAccessible(true);
++                Object instance = instanceField.get(null);
++                if (instance == null) {
++                    throw new PluginLoadException("CapacitorTwilioVoicePlugin 'instance' field is null");
++                }
++                if (!instance.getClass().getName().equals("ee.forgr.capacitor_twilio_voice.CapacitorTwilioVoicePlugin")) {
++                    throw new PluginLoadException(String.format("CapacitorTwilioVoicePlugin 'instance' field is the wrong class (%s)", instance.getClass().getName()));
++                }
++                try {
++                    // This cast will never fail. It should NEVER fail.
++                    this.loadInstance((Plugin) instance);
++                } catch (Exception ex) {
++                    throw new PluginLoadException("Unable to load CapacitorTwilioVoicePlugin plugin instance. Ensure plugin is publicly accessible");
++                }
++            } catch (NoSuchFieldException noSuchFieldException) {
++                throw new PluginLoadException("CapacitorTwilioVoicePlugin doesn't have an 'instance' field");
++            } catch (IllegalAccessException e) {
++                throw new PluginLoadException("CapacitorTwilioVoicePlugin 'instance' field cannot be accessed");
++            }
++
++        }
++
+         if (this.instance != null) {
+             return this.instance;
+         }

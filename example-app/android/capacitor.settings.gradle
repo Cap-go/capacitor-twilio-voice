@@ -2,5 +2,8 @@
 include ':capacitor-android'
 project(':capacitor-android').projectDir = new File('../node_modules/@capacitor/android/capacitor')
 
+include ':capacitor-local-notifications'
+project(':capacitor-local-notifications').projectDir = new File('../node_modules/@capacitor/local-notifications/android')
+
 include ':capgo-capacitor-twilio-voice'
 project(':capgo-capacitor-twilio-voice').projectDir = new File('../../android')

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1016378606521",
+    "project_id": "twilio-calling-9352c",
+    "storage_bucket": "twilio-calling-9352c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1016378606521:android:4fb09a45e487cf0f37ac68",
+        "android_client_info": {
+          "package_name": "com.example.plugin"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCbst73pX_XN5FLZHJ_3Nu9Oot21eUnr60"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -95,18 +95,30 @@ public class Webapp {
          *
          * @returns The Access Token string
          */
-        app.get("/accessToken", ctx -> {
+        app.get("/accessToken/ios", ctx -> {
             // Read the identity param provided
             final String identity = ctx.queryParam("identity") != null ? ctx.queryParam("identity") : IDENTITY;
-            ctx.result(getAccessToken(identity));
+            ctx.result(getAccessToken(identity, "ios"));
         });
+
+                /**
+         * Creates an access token with VoiceGrant using your Twilio credentials.
+         *
+         * @returns The Access Token string
+         */
+        app.get("/accessToken/android", ctx -> {
+            // Read the identity param provided
+            final String identity = ctx.queryParam("identity") != null ? ctx.queryParam("identity") : IDENTITY;
+            ctx.result(getAccessToken(identity, "android"));
+        });
+
 
         /**
          * Creates an access token with VoiceGrant using your Twilio credentials.
          *
          * @returns The Access Token string
          */
-        app.post("/accessToken", ctx -> {
+        app.post("/accessToken/ios", ctx -> {
             // Read the identity param provided
             String identity = null;
             List<NameValuePair> pairs = URLEncodedUtils.parse(ctx.body(), Charset.defaultCharset());
@@ -117,7 +129,21 @@ public class Webapp {
                 ctx.result("Error: " + e.getMessage());
                 return;
             }
-            ctx.result(getAccessToken(identity != null ? identity : IDENTITY));
+            ctx.result(getAccessToken(identity != null ? identity : IDENTITY, "ios"));
+        });
+
+        app.post("/accessToken/android", ctx -> {
+            // Read the identity param provided
+            String identity = null;
+            List<NameValuePair> pairs = URLEncodedUtils.parse(ctx.body(), Charset.defaultCharset());
+            Map<String, String> params = toMap(pairs);
+            try {
+                identity = params.get("identity");
+            } catch (Exception e) {
+                ctx.result("Error: " + e.getMessage());
+                return;
+            }
+            ctx.result(getAccessToken(identity != null ? identity : IDENTITY, "android"));
         });
 
         /**
@@ -237,18 +263,18 @@ public class Webapp {
         });
     }
 
-    private static String getAccessToken(final String identity) {
+    private static String getAccessToken(final String identity, final String platform) {
         // Create Voice grant
         VoiceGrant grant = new VoiceGrant();
         grant.setOutgoingApplicationSid(System.getProperty("APP_SID"));
-        grant.setPushCredentialSid(System.getProperty("PUSH_CREDENTIAL_SID"));
+        grant.setPushCredentialSid(System.getProperty("PUSH_CREDENTIAL_SID_" + platform.toUpperCase()));
 
         // Create access token
         AccessToken token = new AccessToken.Builder(
                 System.getProperty("ACCOUNT_SID"),
                 System.getProperty("API_KEY_SID"),
                 System.getProperty("API_SECRET").getBytes()
-        ).identity(identity).grant(grant).build();
+        ).identity(identity).grant(grant).ttl(86400).build();
         System.out.println(token.toJwt());
         return token.toJwt();
     }

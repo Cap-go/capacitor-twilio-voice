@@ -32,6 +32,7 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "login", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "logout", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "isLoggedIn", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "makeCall", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "acceptCall", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "rejectCall", returnType: CAPPluginReturnPromise),
@@ -232,6 +233,33 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
         
         NSLog("Logout completed successfully")
         call.resolve(["success": true])
+    }
+    
+    @objc func isLoggedIn(_ call: CAPPluginCall) {
+        var isLoggedIn = false
+        var identity: String? = nil
+        
+        if let storedToken = UserDefaults.standard.string(forKey: kCachedAccessToken) {
+            isLoggedIn = isTokenValid(storedToken)
+            
+            if isLoggedIn, let payload = decodeJWTPayload(storedToken) {
+                // Extract identity from grants.identity
+                if let grants = payload["grants"] as? [String: Any] {
+                    identity = grants["identity"] as? String
+                }
+            }
+        }
+        
+        var response: [String: Any] = [
+            "isLoggedIn": isLoggedIn,
+            "hasValidToken": isLoggedIn
+        ]
+        
+        if let identity = identity {
+            response["identity"] = identity
+        }
+        
+        call.resolve(response)
     }
     
     @objc func makeCall(_ call: CAPPluginCall) {
