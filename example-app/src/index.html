@@ -49,12 +49,6 @@
         padding: 4px;
         border-radius: 8px;
         display: none;
-        animation: fadeIn 0.3s ease-in-out;
-      }
-
-      @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
       }
 
       .twilio-logo {
@@ -67,16 +61,6 @@
         justify-content: center;
         margin-bottom: 20px;
         box-shadow: 0 8px 20px rgba(226, 62, 58, 0.3);
-        animation: logoSpin 0s ease-in-out;
-      }
-
-      @keyframes logoSpin {
-        from { transform: rotate(0deg); }
-        to { transform: rotate(360deg); }
-      }
-
-      .twilio-logo.spinning {
-        animation: logoSpin 0.5s linear infinite;
       }
 
       .twilio-logo svg {
@@ -224,18 +208,6 @@
 
       .status-indicator.visible {
         display: block;
-        animation: slideDown 0.3s ease-out;
-      }
-
-      @keyframes slideDown {
-        from {
-          transform: translateX(-50%) translateY(-100%);
-          opacity: 0;
-        }
-        to {
-          transform: translateX(-50%) translateY(0);
-          opacity: 1;
-        }
       }
 
       .status-indicator.error {
@@ -331,16 +303,7 @@
         display: flex;
       }
 
-      @keyframes slideInFromTop {
-        from {
-          transform: translateY(-100%);
-          opacity: 0;
-        }
-        to {
-          transform: translateY(0);
-          opacity: 1;
-        }
-      }
+
 
       .incoming-call-content {
         text-align: center;
@@ -364,18 +327,6 @@
         justify-content: center;
         margin: 0 auto;
         box-shadow: 0 8px 32px rgba(79, 172, 254, 0.3);
-        animation: pulse 2s infinite;
-      }
-
-      @keyframes pulse {
-        0%, 100% {
-          transform: scale(1);
-          box-shadow: 0 8px 32px rgba(79, 172, 254, 0.3);
-        }
-        50% {
-          transform: scale(1.05);
-          box-shadow: 0 12px 40px rgba(79, 172, 254, 0.5);
-        }
       }
 
       .avatar-circle svg {

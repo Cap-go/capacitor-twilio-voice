@@ -1,6 +1,7 @@
 package ee.forgr.capacitor_twilio_voice;
 
 import android.Manifest;
+import android.app.Activity;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -82,6 +83,10 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
     private Call activeCall;
     
     private AudioSwitch audioSwitch;
+
+    private Context injectedContext;
+
+    private Class<?> mainActivityClass;
     
     // Notification and sound management
     private static final String NOTIFICATION_CHANNEL_ID = "twilio_voice_channel";
@@ -106,7 +111,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         instance = this;
         
         // Load stored access token
-        SharedPreferences prefs = getContext().getSharedPreferences("CapacitorTwilioVoice", Context.MODE_PRIVATE);
+        SharedPreferences prefs = getSafeContext().getSharedPreferences("CapacitorTwilioVoice", Context.MODE_PRIVATE);
         accessToken = prefs.getString(PREF_ACCESS_TOKEN, null);
         
         // Initialize FCM and register for push notifications
@@ -121,7 +126,44 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         // Initialize sound and vibration
         initializeSoundAndVibration();
         
+        // Check if app was launched to auto-accept a call
+        checkForAutoAcceptCall();
+        
         Log.d(TAG, "CapacitorTwilioVoice plugin loaded");
+    }
+    
+    private void checkForAutoAcceptCall() {
+        try {
+            Activity activity = getActivity();
+            if (activity != null) {
+                Intent intent = activity.getIntent();
+                if (intent != null) {
+                    // Check for auto-accept flag OR accept action
+                    boolean shouldAutoAccept = intent.getBooleanExtra("AUTO_ACCEPT_CALL", false) || 
+                                             ACTION_ACCEPT_CALL.equals(intent.getAction());
+                    
+                    if (shouldAutoAccept) {
+                        String callSid = intent.getStringExtra(EXTRA_CALL_SID);
+                        Log.d(TAG, "App launched with auto-accept for call: " + callSid + " (action: " + intent.getAction() + ")");
+                        
+                        if (callSid != null) {
+                            // Clear the intent extras and action to prevent repeated auto-accept
+                            intent.removeExtra("AUTO_ACCEPT_CALL");
+                            intent.removeExtra(EXTRA_CALL_SID);
+                            intent.setAction(null);
+                            
+                            // Delay the auto-accept slightly to ensure plugin is fully loaded
+                            new android.os.Handler().postDelayed(() -> {
+                                Log.d(TAG, "Auto-accepting call: " + callSid);
+                                acceptCallFromNotification(callSid);
+                            }, 500);
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error checking for auto-accept call", e);
+        }
     }
 
     @Override
@@ -144,6 +186,14 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         Log.d(TAG, "CapacitorTwilioVoice plugin destroyed");
     }
 
+    public void setInjectedContext(Context injectedContext) {
+        this.injectedContext = injectedContext;
+    }
+
+    public void setMainActivityClass(Class<?> mainActivityClass) {
+        this.mainActivityClass = mainActivityClass;
+    }
+
     private void initializeNotifications() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
@@ -156,7 +206,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             channel.enableVibration(true);
             channel.setLockscreenVisibility(NotificationCompat.VISIBILITY_PUBLIC);
             
-            NotificationManager notificationManager = getContext().getSystemService(NotificationManager.class);
+            NotificationManager notificationManager = getSafeContext().getSystemService(NotificationManager.class);
             if (notificationManager != null) {
                 notificationManager.createNotificationChannel(channel);
             }
@@ -164,7 +214,17 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
     }
 
     private void initializeSoundAndVibration() {
-        vibrator = (Vibrator) getContext().getSystemService(Context.VIBRATOR_SERVICE);
+        vibrator = (Vibrator) getSafeContext().getSystemService(Context.VIBRATOR_SERVICE);
+    }
+
+    private Context getSafeContext() {
+        if (this.bridge != null) {
+            return this.getContext();
+        } else if (this.injectedContext != null) {
+            return this.injectedContext;
+        } else {
+            throw new RuntimeException("Cannot find context");
+        }
     }
 
     private void startRingtone() {
@@ -175,7 +235,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             
             Uri ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
             ringtonePlayer = new MediaPlayer();
-            ringtonePlayer.setDataSource(getContext(), ringtoneUri);
+            ringtonePlayer.setDataSource(getSafeContext(), ringtoneUri);
             ringtonePlayer.setAudioStreamType(AudioManager.STREAM_RING);
             ringtonePlayer.setLooping(true);
             ringtonePlayer.prepare();
@@ -232,7 +292,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
                     Log.d(TAG, "FCM Registration Token: " + fcmToken);
                     
                     // Store FCM token
-                    SharedPreferences prefs = getContext().getSharedPreferences("CapacitorTwilioVoice", Context.MODE_PRIVATE);
+                    SharedPreferences prefs = getSafeContext().getSharedPreferences("CapacitorTwilioVoice", Context.MODE_PRIVATE);
                     prefs.edit().putString(PREF_FCM_TOKEN, fcmToken).apply();
                     
                     // Register with Twilio if we have an access token
@@ -272,7 +332,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
     }
 
     private void initializeAudioSwitch() {
-        audioSwitch = new AudioSwitch(getContext().getApplicationContext(), null, true);
+        audioSwitch = new AudioSwitch(getSafeContext().getApplicationContext(), null, true);
         audioSwitch.start((audioDevices, selectedDevice) -> {
             Log.d(TAG, "Available audio devices: " + audioDevices.size());
             for (AudioDevice device : audioDevices) {
@@ -300,7 +360,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         
         // Store access token
         accessToken = token;
-        SharedPreferences prefs = getContext().getSharedPreferences("CapacitorTwilioVoice", Context.MODE_PRIVATE);
+        SharedPreferences prefs = getSafeContext().getSharedPreferences("CapacitorTwilioVoice", Context.MODE_PRIVATE);
         prefs.edit().putString(PREF_ACCESS_TOKEN, token).apply();
         
         Log.d(TAG, "Access token stored and validated successfully");
@@ -323,7 +383,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         }
         
         // Clear stored tokens
-        SharedPreferences prefs = getContext().getSharedPreferences("CapacitorTwilioVoice", Context.MODE_PRIVATE);
+        SharedPreferences prefs = getSafeContext().getSharedPreferences("CapacitorTwilioVoice", Context.MODE_PRIVATE);
         prefs.edit().remove(PREF_ACCESS_TOKEN).remove(PREF_FCM_TOKEN).apply();
         
         // Clear instance variables
@@ -408,7 +468,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             .params(createCallParams(to))
             .build();
             
-        Call voiceCall = Voice.connect(getContext(), connectOptions, callListener);
+        Call voiceCall = Voice.connect(getSafeContext(), connectOptions, callListener);
         
         if (voiceCall != null) {
             // Generate UUID for tracking (Android doesn't use UUID in ConnectOptions)
@@ -448,7 +508,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         // Dismiss notification and stop sounds
         dismissIncomingCallNotification();
         
-        Call acceptedCall = callInvite.accept(getContext(), callListener);
+        Call acceptedCall = callInvite.accept(getSafeContext(), callListener);
         if (acceptedCall != null) {
             // Store initially by the invite ID, will be updated when SID becomes available
             activeCall = acceptedCall;
@@ -479,7 +539,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         // Dismiss notification and stop sounds
         dismissIncomingCallNotification();
         
-        callInvite.reject(getContext());
+        callInvite.reject(getSafeContext());
         activeCallInvites.remove(callSid);
         
         JSObject ret = new JSObject();
@@ -631,7 +691,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
 
     @PluginMethod
     public void checkMicrophonePermission(PluginCall call) {
-        boolean hasPermission = ActivityCompat.checkSelfPermission(getContext(), 
+        boolean hasPermission = ActivityCompat.checkSelfPermission(getSafeContext(), 
             Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
         
         JSObject ret = new JSObject();
@@ -868,42 +928,59 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
                 callerName = callerName.substring(7); // Remove "client:" prefix
             }
 
-            // Create intent for accepting the call
-            Intent acceptIntent = new Intent(getContext(), NotificationActionReceiver.class);
+            // Create intent for accepting the call - directly launch the app
+            Intent acceptIntent = new Intent(getSafeContext(), mainActivityClass);
             acceptIntent.setAction(ACTION_ACCEPT_CALL);
+            acceptIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            acceptIntent.putExtra("AUTO_ACCEPT_CALL", true);
             acceptIntent.putExtra(EXTRA_CALL_SID, callSid);
-            PendingIntent acceptPendingIntent = PendingIntent.getBroadcast(
-                getContext(), 
+            PendingIntent acceptPendingIntent = PendingIntent.getActivity(
+                getSafeContext(), 
                 0, 
                 acceptIntent, 
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
             );
 
             // Create intent for rejecting the call
-            Intent rejectIntent = new Intent(getContext(), NotificationActionReceiver.class);
+            Intent rejectIntent = new Intent(getSafeContext(), NotificationActionReceiver.class);
             rejectIntent.setAction(ACTION_REJECT_CALL);
             rejectIntent.putExtra(EXTRA_CALL_SID, callSid);
             PendingIntent rejectPendingIntent = PendingIntent.getBroadcast(
-                getContext(), 
+                getSafeContext(), 
                 1, 
                 rejectIntent, 
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
             );
 
             // Create intent for full screen
-            Intent fullScreenIntent = new Intent(getContext(), getActivity().getClass());
+            Intent fullScreenIntent = new Intent(getSafeContext(), mainActivityClass);
             fullScreenIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
             fullScreenIntent.putExtra("INCOMING_CALL", true);
             fullScreenIntent.putExtra(EXTRA_CALL_SID, callSid);
             PendingIntent fullScreenPendingIntent = PendingIntent.getActivity(
-                getContext(), 
+                getSafeContext(), 
                 2, 
                 fullScreenIntent, 
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
             );
 
-            // Build notification
-            NotificationCompat.Builder builder = new NotificationCompat.Builder(getContext(), NOTIFICATION_CHANNEL_ID)
+            // Create Person object for the caller
+            androidx.core.app.Person caller = new androidx.core.app.Person.Builder()
+                .setName(callerName)
+                .setImportant(true)
+                .build();
+
+            // Create CallStyle notification with proper colored buttons
+            NotificationCompat.CallStyle callStyle = NotificationCompat.CallStyle.forIncomingCall(
+                caller,              // person (caller as Person object)
+                rejectPendingIntent, // decline intent
+                acceptPendingIntent  // answer intent
+            )
+            .setAnswerButtonColorHint(0xFF4CAF50)    // Green color for accept button
+            .setDeclineButtonColorHint(0xFFF44336);  // Red color for reject button
+
+            // Build notification with CallStyle
+            NotificationCompat.Builder builder = new NotificationCompat.Builder(getSafeContext(), NOTIFICATION_CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_menu_call)
                 .setContentTitle("Incoming Call")
                 .setContentText(callerName + " is calling")
@@ -913,12 +990,18 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
                 .setOngoing(true)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setFullScreenIntent(fullScreenPendingIntent, true)
-                .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Reject", rejectPendingIntent)
-                .addAction(android.R.drawable.ic_menu_call, "Accept", acceptPendingIntent)
-                .setContentIntent(fullScreenPendingIntent);
+                .setContentIntent(fullScreenPendingIntent)
+                .setStyle(callStyle)
+                .setDefaults(NotificationCompat.DEFAULT_VIBRATE)
+                .setTimeoutAfter(30000); // Auto-dismiss after 30 seconds
 
-            NotificationManagerCompat notificationManager = NotificationManagerCompat.from(getContext());
-            notificationManager.notify(INCOMING_CALL_NOTIFICATION_ID, builder.build());
+            NotificationManagerCompat notificationManager = NotificationManagerCompat.from(getSafeContext());
+            if (ActivityCompat.checkSelfPermission(getSafeContext(), Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                Log.e(TAG, "Cannot get POST_NOTIFICATION perm");
+                return;
+            } else {
+                notificationManager.notify(INCOMING_CALL_NOTIFICATION_ID, builder.build());
+            }
             
             Log.d(TAG, "Incoming call notification shown");
         } catch (Exception e) {
@@ -928,7 +1011,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
 
     private void dismissIncomingCallNotification() {
         try {
-            NotificationManagerCompat notificationManager = NotificationManagerCompat.from(getContext());
+            NotificationManagerCompat notificationManager = NotificationManagerCompat.from(getSafeContext());
             notificationManager.cancel(INCOMING_CALL_NOTIFICATION_ID);
             stopRingtone();
             Log.d(TAG, "Incoming call notification dismissed");
@@ -993,7 +1076,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             dismissIncomingCallNotification();
             
             // Accept the call - this will trigger the normal call flow
-            Call acceptedCall = callInvite.accept(getContext(), callListener);
+            Call acceptedCall = callInvite.accept(getSafeContext(), callListener);
             if (acceptedCall != null) {
                 activeCall = acceptedCall;
                 activeCallInvites.remove(callSid);
@@ -1014,11 +1097,17 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             // Dismiss notification and stop sounds
             dismissIncomingCallNotification();
             
-            callInvite.reject(getContext());
+            callInvite.reject(getSafeContext());
             activeCallInvites.remove(callSid);
             
+            // Notify JavaScript that the call was rejected from notification
+            JSObject data = new JSObject();
+            data.put("callSid", callSid);
+            data.put("from", callInvite.getFrom());
+            data.put("rejectedFromNotification", true);
+            notifyListeners("callDisconnected", data);
+            
             Log.d(TAG, "Call rejected from notification");
-            // Note: No need to emit callDisconnected since the call was never connected
         } else {
             Log.e(TAG, "Call invite not found for SID: " + callSid);
         }

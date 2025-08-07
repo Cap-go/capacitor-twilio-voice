@@ -578,6 +578,8 @@ class TwilioVoiceApp {
     
     if (data.error) {
       this.showStatus(`Call ended: ${data.error}`, 'error');
+    } else if (data.rejectedFromNotification) {
+      this.showStatus('Call rejected from notification', 'success');
     } else {
       this.showStatus('Call ended', 'success');
     }
@@ -633,11 +635,11 @@ class TwilioVoiceApp {
   }
 
   startSpinning() {
-    this.twilioLogo.classList.add('spinning');
+    // Animation removed
   }
 
   stopSpinning() {
-    this.twilioLogo.classList.remove('spinning');
+    // Animation removed
   }
 
   resetCallButton() {
