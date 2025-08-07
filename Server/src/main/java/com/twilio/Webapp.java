@@ -1,36 +1,32 @@
 package com.twilio;
 
+import com.twilio.http.HttpMethod;
+import com.twilio.http.TwilioRestClient;
 import com.twilio.jwt.accesstoken.AccessToken;
 import com.twilio.jwt.accesstoken.VoiceGrant;
-import com.twilio.type.*;
+import com.twilio.rest.api.v2010.account.Call;
+import com.twilio.twiml.TwiMLException;
+import com.twilio.twiml.VoiceResponse;
 import com.twilio.twiml.voice.Client;
 import com.twilio.twiml.voice.Dial;
 import com.twilio.twiml.voice.Number;
-import com.twilio.twiml.VoiceResponse;
 import com.twilio.twiml.voice.Say;
-import com.twilio.twiml.TwiMLException;
-import com.twilio.http.TwilioRestClient;
-import com.twilio.http.HttpMethod;
-import com.twilio.rest.api.v2010.account.Call;
-
-import java.io.File;
-import java.io.FileInputStream;
-import java.util.*;
-
-import java.net.URI;
-
+import com.twilio.type.*;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
-
+import java.io.File;
+import java.io.FileInputStream;
+import java.lang.Character;
+import java.net.URI;
+import java.nio.charset.Charset;
+import java.util.*;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.utils.URLEncodedUtils;
-
-import java.nio.charset.Charset;
-import java.lang.Character;
 
 public class Webapp {
 
     public static class MemorySector {
+
         private final int startIndex;
         private final int endIndex;
         private final List<Integer> memory;
@@ -67,27 +63,27 @@ public class Webapp {
         Javalin app = Javalin.create().start(4567);
 
         // Add CORS headers manually
-        app.before(ctx -> {
+        app.before((ctx) -> {
             ctx.header("Access-Control-Allow-Origin", "*");
             ctx.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
             ctx.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
         });
 
-        app.options("/*", ctx -> {
+        app.options("/*", (ctx) -> {
             ctx.status(200);
         });
 
         // Add custom logging filter
-        app.after(ctx -> {
+        app.after((ctx) -> {
             LoggingFilter.logRequestResponse(ctx);
         });
 
-        app.get("/", ctx -> {
+        app.get("/", (ctx) -> {
             ctx.result(welcome());
         });
 
-        app.post("/", ctx -> {
-           ctx.result(welcome());
+        app.post("/", (ctx) -> {
+            ctx.result(welcome());
         });
 
         /**
@@ -95,30 +91,29 @@ public class Webapp {
          *
          * @returns The Access Token string
          */
-        app.get("/accessToken/ios", ctx -> {
+        app.get("/accessToken/ios", (ctx) -> {
             // Read the identity param provided
             final String identity = ctx.queryParam("identity") != null ? ctx.queryParam("identity") : IDENTITY;
             ctx.result(getAccessToken(identity, "ios"));
         });
 
-                /**
+        /**
          * Creates an access token with VoiceGrant using your Twilio credentials.
          *
          * @returns The Access Token string
          */
-        app.get("/accessToken/android", ctx -> {
+        app.get("/accessToken/android", (ctx) -> {
             // Read the identity param provided
             final String identity = ctx.queryParam("identity") != null ? ctx.queryParam("identity") : IDENTITY;
             ctx.result(getAccessToken(identity, "android"));
         });
-
 
         /**
          * Creates an access token with VoiceGrant using your Twilio credentials.
          *
          * @returns The Access Token string
          */
-        app.post("/accessToken/ios", ctx -> {
+        app.post("/accessToken/ios", (ctx) -> {
             // Read the identity param provided
             String identity = null;
             List<NameValuePair> pairs = URLEncodedUtils.parse(ctx.body(), Charset.defaultCharset());
@@ -132,7 +127,7 @@ public class Webapp {
             ctx.result(getAccessToken(identity != null ? identity : IDENTITY, "ios"));
         });
 
-        app.post("/accessToken/android", ctx -> {
+        app.post("/accessToken/android", (ctx) -> {
             // Read the identity param provided
             String identity = null;
             List<NameValuePair> pairs = URLEncodedUtils.parse(ctx.body(), Charset.defaultCharset());
@@ -156,12 +151,12 @@ public class Webapp {
          *
          * @returns The TwiMl used to respond to an outgoing call
          */
-        app.get("/makeCall", ctx -> {
+        app.get("/makeCall", (ctx) -> {
             final String to = ctx.queryParam("to");
             String from = ctx.queryParam("from");
-//            if (from != null && from.startsWith("client:")) {
-//                from = from.replaceFirst("client:", "");
-//            }
+            //            if (from != null && from.startsWith("client:")) {
+            //                from = from.replaceFirst("client:", "");
+            //            }
             System.out.printf("From: %s, To: %s%n", from, to);
             ctx.result(call(to, from));
         });
@@ -177,7 +172,7 @@ public class Webapp {
          *
          * @returns The TwiMl used to respond to an outgoing call
          */
-        app.post("/makeCall", ctx -> {
+        app.post("/makeCall", (ctx) -> {
             String to = "";
             String from = "";
             List<NameValuePair> pairs = URLEncodedUtils.parse(ctx.body(), Charset.defaultCharset());
@@ -189,14 +184,14 @@ public class Webapp {
                 ctx.result("Error: " + e.getMessage());
                 return;
             }
-//            if (from.startsWith("client:")) {
-//                from = from.replaceFirst("client:", "");
-//            }
+            //            if (from.startsWith("client:")) {
+            //                from = from.replaceFirst("client:", "");
+            //            }
             System.out.printf("From: %s, To: %s%n", from, to);
             ctx.result(call(to, from));
         });
 
-        app.post("/callAlice", ctx -> {
+        app.post("/callAlice", (ctx) -> {
             String from = "";
             List<NameValuePair> pairs = URLEncodedUtils.parse(ctx.body(), Charset.defaultCharset());
             Map<String, String> params = toMap(pairs);
@@ -208,8 +203,7 @@ public class Webapp {
             }
 
             Client client = new Client.Builder("alice").build();
-            Dial dial = new Dial.Builder().callerId(from).timeout(30).client(client)
-                    .build();
+            Dial dial = new Dial.Builder().callerId(from).timeout(30).client(client).build();
             VoiceResponse voiceResponse = new VoiceResponse.Builder().dial(dial).build();
             ctx.result(voiceResponse.toXml());
         });
@@ -219,7 +213,7 @@ public class Webapp {
          *
          * @returns The CallSid
          */
-        app.get("/placeCall", ctx -> {
+        app.get("/placeCall", (ctx) -> {
             final String to = ctx.queryParam("to");
             // The fully qualified URL that should be consulted by Twilio when the call connects.
             URI uri = URI.create(ctx.scheme() + "://" + ctx.host() + "/incoming");
@@ -232,7 +226,7 @@ public class Webapp {
          *
          * @returns The CallSid
          */
-        app.post("/placeCall", ctx -> {
+        app.post("/placeCall", (ctx) -> {
             String to = "";
             List<NameValuePair> pairs = URLEncodedUtils.parse(ctx.body(), Charset.defaultCharset());
             Map<String, String> params = toMap(pairs);
@@ -251,14 +245,14 @@ public class Webapp {
         /**
          * Creates an endpoint that plays back a greeting.
          */
-        app.get("/incoming", ctx -> {
+        app.get("/incoming", (ctx) -> {
             ctx.result(greet());
         });
 
         /**
          * Creates an endpoint that plays back a greeting.
          */
-        app.post("/incoming", ctx -> {
+        app.post("/incoming", (ctx) -> {
             ctx.result(greet());
         });
     }
@@ -271,10 +265,14 @@ public class Webapp {
 
         // Create access token
         AccessToken token = new AccessToken.Builder(
-                System.getProperty("ACCOUNT_SID"),
-                System.getProperty("API_KEY_SID"),
-                System.getProperty("API_SECRET").getBytes()
-        ).identity(identity).grant(grant).ttl(86400).build();
+            System.getProperty("ACCOUNT_SID"),
+            System.getProperty("API_KEY_SID"),
+            System.getProperty("API_SECRET").getBytes()
+        )
+            .identity(identity)
+            .grant(grant)
+            .ttl(86400)
+            .build();
         System.out.println(token.toJwt());
         return token.toJwt();
     }
@@ -287,13 +285,11 @@ public class Webapp {
             voiceResponse = new VoiceResponse.Builder().say(say).build();
         } else if (isPhoneNumber(to)) {
             Number number = new Number.Builder(to).build();
-            Dial dial = new Dial.Builder().callerId(CALLER_NUMBER).number(number)
-                    .build();
+            Dial dial = new Dial.Builder().callerId(CALLER_NUMBER).number(number).build();
             voiceResponse = new VoiceResponse.Builder().dial(dial).build();
         } else {
             Client client = new Client.Builder(to).build();
-            Dial dial = new Dial.Builder().callerId(from).timeout(30).client(client)
-                    .build();
+            Dial dial = new Dial.Builder().callerId(from).timeout(30).client(client).build();
             voiceResponse = new VoiceResponse.Builder().dial(dial).build();
         }
         try {
@@ -306,8 +302,8 @@ public class Webapp {
 
     private static String callUsingRestClient(final String to, final URI uri) {
         final TwilioRestClient client = new TwilioRestClient.Builder(System.getProperty("API_KEY"), System.getProperty("API_SECRET"))
-                .accountSid(System.getProperty("ACCOUNT_SID"))
-                .build();
+            .accountSid(System.getProperty("ACCOUNT_SID"))
+            .build();
 
         if (to == null || to.isEmpty()) {
             com.twilio.type.Client clientEndpoint = new com.twilio.type.Client("client:" + IDENTITY);
@@ -361,7 +357,7 @@ public class Webapp {
         final Properties props = new Properties();
         props.load(new FileInputStream(env));
         props.putAll(System.getenv());
-        props.entrySet().forEach(p -> System.setProperty(p.getKey().toString(), p.getValue().toString()));
+        props.entrySet().forEach((p) -> System.setProperty(p.getKey().toString(), p.getValue().toString()));
     }
 
     private static Map<String, String> toMap(final List<NameValuePair> pairs) {

@@ -1,10 +1,8 @@
 package ee.forgr.capacitor_twilio_voice;
 
 import android.util.Log;
-
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
 import com.twilio.voice.CallException;
@@ -14,6 +12,7 @@ import com.twilio.voice.MessageListener;
 import com.twilio.voice.Voice;
 
 public class VoiceFirebaseMessagingService extends FirebaseMessagingService implements MessageListener {
+
     private static final String TAG = "VoiceFirebaseService";
 
     @Override
@@ -32,17 +31,14 @@ public class VoiceFirebaseMessagingService extends FirebaseMessagingService impl
     @Override
     public void onMessageReceived(@NonNull RemoteMessage remoteMessage) {
         super.onMessageReceived(remoteMessage);
-        Log.d(TAG, String.format(
-                "Received Firebase message\n\tmessage data: %s\n\tfrom: %s",
-                remoteMessage.getData(),
-                remoteMessage.getFrom()));
+        Log.d(
+            TAG,
+            String.format("Received Firebase message\n\tmessage data: %s\n\tfrom: %s", remoteMessage.getData(), remoteMessage.getFrom())
+        );
 
         // Check if message contains a data payload and handle with Twilio Voice SDK
-        if (!remoteMessage.getData().isEmpty() && 
-            !Voice.handleMessage(this, remoteMessage.getData(), this)) {
-            Log.w(TAG, String.format(
-                "Received message was not a valid Twilio Voice SDK payload: %s", 
-                remoteMessage.getData()));
+        if (!remoteMessage.getData().isEmpty() && !Voice.handleMessage(this, remoteMessage.getData(), this)) {
+            Log.w(TAG, String.format("Received message was not a valid Twilio Voice SDK payload: %s", remoteMessage.getData()));
         }
     }
 
@@ -54,8 +50,7 @@ public class VoiceFirebaseMessagingService extends FirebaseMessagingService impl
     }
 
     @Override
-    public void onCancelledCallInvite(@NonNull CancelledCallInvite cancelledCallInvite,
-                                     @Nullable CallException callException) {
+    public void onCancelledCallInvite(@NonNull CancelledCallInvite cancelledCallInvite, @Nullable CallException callException) {
         Log.d(TAG, "Received cancelled call invite");
         handleCancelledCallInvite(cancelledCallInvite);
     }
@@ -83,6 +78,4 @@ public class VoiceFirebaseMessagingService extends FirebaseMessagingService impl
             Log.w(TAG, "Plugin instance not available to handle cancelled call invite");
         }
     }
-
-
 }
