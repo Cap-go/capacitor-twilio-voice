@@ -21,8 +21,11 @@ public class NotificationActionReceiver extends BroadcastReceiver {
         CapacitorTwilioVoicePlugin plugin = CapacitorTwilioVoicePlugin.getInstance();
         
         if (ACTION_ACCEPT_CALL.equals(action)) {
-            // Accept actions should now go directly to the main activity, not through this receiver
-            Log.d(TAG, "Accept action received in broadcast receiver - this shouldn't happen anymore");
+            if (plugin == null) {
+                Log.d(TAG, "App not running, cannot accept call directly");
+                return;
+            }
+            plugin.acceptCallFromNotification(callSid);
         } else if (ACTION_REJECT_CALL.equals(action)) {
             if (plugin == null) {
                 // App is not running, but we can still reject the call

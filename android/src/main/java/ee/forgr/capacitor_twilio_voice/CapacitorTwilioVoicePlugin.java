@@ -6,10 +6,13 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.ServiceConnection;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.os.IBinder;
 import android.media.AudioAttributes;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
@@ -98,6 +101,102 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
     
     private MediaPlayer ringtonePlayer;
     private Vibrator vibrator;
+    
+    // Voice Call Service
+    private VoiceCallService voiceCallService;
+    private boolean isServiceBound = false;
+    
+    private final ServiceConnection serviceConnection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder service) {
+            Log.d(TAG, "VoiceCallService connected");
+            VoiceCallService.VoiceCallBinder binder = (VoiceCallService.VoiceCallBinder) service;
+            voiceCallService = binder.getService();
+            isServiceBound = true;
+            
+            // Set up service listener to relay events to JavaScript
+            voiceCallService.setServiceListener(serviceListener);
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+            Log.d(TAG, "VoiceCallService disconnected");
+            voiceCallService = null;
+            isServiceBound = false;
+        }
+    };
+    
+    // Service listener to relay events from the service to JavaScript
+    private final VoiceCallService.VoiceCallServiceListener serviceListener = new VoiceCallService.VoiceCallServiceListener() {
+        @Override
+        public void onCallConnected(Call call) {
+            activeCall = call;
+            activeCalls.put(call.getSid(), call);
+            
+            JSObject data = new JSObject();
+            data.put("callSid", call.getSid());
+            notifyListeners("callConnected", data);
+        }
+
+        @Override
+        public void onCallDisconnected(Call call, CallException error) {
+            activeCall = null;
+            activeCalls.remove(call.getSid());
+            
+            JSObject data = new JSObject();
+            data.put("callSid", call.getSid());
+            if (error != null) {
+                data.put("error", error.getMessage());
+            }
+            notifyListeners("callDisconnected", data);
+        }
+
+        @Override
+        public void onCallRinging(Call call) {
+            JSObject data = new JSObject();
+            data.put("callSid", call.getSid());
+            notifyListeners("callRinging", data);
+        }
+
+        @Override
+        public void onCallReconnecting(Call call, CallException error) {
+            JSObject data = new JSObject();
+            data.put("callSid", call.getSid());
+            if (error != null) {
+                data.put("error", error.getMessage());
+            }
+            notifyListeners("callReconnecting", data);
+        }
+
+        @Override
+        public void onCallReconnected(Call call) {
+            JSObject data = new JSObject();
+            data.put("callSid", call.getSid());
+            notifyListeners("callReconnected", data);
+        }
+
+        @Override
+        public void onCallQualityWarningsChanged(Call call, Set<Call.CallQualityWarning> currentWarnings, Set<Call.CallQualityWarning> previousWarnings) {
+            JSObject data = new JSObject();
+            data.put("callSid", call.getSid());
+            
+            // Convert warnings to string array
+            JSArray currentWarningsArray = new JSArray();
+            for (Call.CallQualityWarning warning : currentWarnings) {
+                currentWarningsArray.put(warning.name());
+            }
+            data.put("currentWarnings", currentWarningsArray);
+            
+            notifyListeners("callQualityWarningsChanged", data);
+        }
+
+        @Override
+        public void onCallInviteAccepted(CallInvite callInvite) {
+            // Remove from active invites since it's now being handled by the service
+            activeCallInvites.remove(callInvite.getCallSid());
+            dismissIncomingCallNotification();
+        }
+    };
 
     public static CapacitorTwilioVoicePlugin getInstance() {
         return instance;
@@ -129,8 +228,22 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         // Check if app was launched to auto-accept a call
         checkForAutoAcceptCall();
         
+        // Check if app was launched due to an incoming call notification
+        checkForIncomingCallNotification();
+        
+        // Bind to the VoiceCallService
+        bindToVoiceCallService();
+        
         Log.d(TAG, "CapacitorTwilioVoice plugin loaded");
     }
+    
+    private void bindToVoiceCallService() {
+        Intent intent = new Intent(getSafeContext(), VoiceCallService.class);
+        getSafeContext().bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
+        Log.d(TAG, "Binding to VoiceCallService");
+    }
+    
+    // Service cleanup is handled when the activity is destroyed
     
     private void checkForAutoAcceptCall() {
         try {
@@ -163,6 +276,52 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             }
         } catch (Exception e) {
             Log.e(TAG, "Error checking for auto-accept call", e);
+        }
+    }
+    
+    private void checkForIncomingCallNotification() {
+        try {
+            Activity activity = getActivity();
+            if (activity != null) {
+                Intent intent = activity.getIntent();
+                if (intent != null && intent.getBooleanExtra("INCOMING_CALL", false)) {
+                    String callSid = intent.getStringExtra(EXTRA_CALL_SID);
+                    String callerName = intent.getStringExtra("CALLER_NAME");
+                    String callFrom = intent.getStringExtra("CALL_FROM");
+                    
+                    Log.d(TAG, "App opened via incoming call notification: " + callSid + " from: " + callFrom);
+                    
+                    if (callSid != null && callFrom != null) {
+                        // Clear the intent extras to prevent repeated notifications
+                        intent.removeExtra("INCOMING_CALL");
+                        intent.removeExtra(EXTRA_CALL_SID);
+                        intent.removeExtra("CALLER_NAME");
+                        intent.removeExtra("CALL_FROM");
+                        
+                        // Check if we still have the call invite
+                        CallInvite callInvite = activeCallInvites.get(callSid);
+                        if (callInvite != null) {
+                            // Delay sending the event to ensure JavaScript is ready
+                            new android.os.Handler().postDelayed(() -> {
+                                Log.d(TAG, "Sending incoming call event to JavaScript: " + callSid);
+                                
+                                JSObject data = new JSObject();
+                                data.put("callSid", callSid);
+                                data.put("from", callFrom);
+                                data.put("to", callInvite.getTo());
+                                data.put("callerName", callerName != null ? callerName : callFrom);
+                                data.put("openedFromNotification", true);
+                                
+                                notifyListeners("callInviteReceived", data);
+                            }, 1000); // Give JavaScript more time to initialize
+                        } else {
+                            Log.w(TAG, "Call invite not found for SID: " + callSid + " (may have been cancelled)");
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error checking for incoming call notification", e);
         }
     }
 
@@ -464,32 +623,26 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             to = ""; // Empty string for echo test
         }
         
-        ConnectOptions connectOptions = new ConnectOptions.Builder(accessToken)
-            .params(createCallParams(to))
-            .build();
-            
-        Call voiceCall = Voice.connect(getSafeContext(), connectOptions, callListener);
+        // Start call via the foreground service
+        Intent serviceIntent = new Intent(getSafeContext(), VoiceCallService.class);
+        serviceIntent.setAction(VoiceCallService.ACTION_START_CALL);
+        serviceIntent.putExtra(VoiceCallService.EXTRA_CALL_TO, to);
+        serviceIntent.putExtra(VoiceCallService.EXTRA_ACCESS_TOKEN, accessToken);
         
-        if (voiceCall != null) {
-            // Generate UUID for tracking (Android doesn't use UUID in ConnectOptions)
-            UUID callUuid = UUID.randomUUID();
-            callsByUuid.put(callUuid, voiceCall);
-            activeCall = voiceCall;
+        try {
+            getSafeContext().startForegroundService(serviceIntent);
             
             JSObject ret = new JSObject();
             ret.put("success", true);
-            ret.put("callSid", callUuid.toString()); // Return UUID as callSid for now
+            ret.put("callSid", "pending"); // Will be updated when service connects
             call.resolve(ret);
-        } else {
-            call.reject("Failed to connect call");
+        } catch (Exception e) {
+            Log.e(TAG, "Error starting call service", e);
+            call.reject("Failed to start call: " + e.getMessage());
         }
     }
 
-    private Map<String, String> createCallParams(String to) {
-        Map<String, String> params = new HashMap<>();
-        params.put("to", to);
-        return params;
-    }
+    // Call parameter creation is now handled by VoiceCallService
 
     @PluginMethod
     public void acceptCall(PluginCall call) {
@@ -505,20 +658,21 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             return;
         }
         
-        // Dismiss notification and stop sounds
-        dismissIncomingCallNotification();
+        // Accept call via the foreground service
+        Intent serviceIntent = new Intent(getSafeContext(), VoiceCallService.class);
+        serviceIntent.setAction(VoiceCallService.ACTION_ACCEPT_CALL);
+        serviceIntent.putExtra(VoiceCallService.EXTRA_CALL_INVITE, callInvite);
+        serviceIntent.putExtra(VoiceCallService.EXTRA_ACCESS_TOKEN, accessToken);
         
-        Call acceptedCall = callInvite.accept(getSafeContext(), callListener);
-        if (acceptedCall != null) {
-            // Store initially by the invite ID, will be updated when SID becomes available
-            activeCall = acceptedCall;
-            activeCallInvites.remove(callSid);
+        try {
+            getSafeContext().startForegroundService(serviceIntent);
             
             JSObject ret = new JSObject();
             ret.put("success", true);
             call.resolve(ret);
-        } else {
-            call.reject("Failed to accept call");
+        } catch (Exception e) {
+            Log.e(TAG, "Error accepting call via service", e);
+            call.reject("Failed to accept call: " + e.getMessage());
         }
     }
 
@@ -549,64 +703,40 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
 
     @PluginMethod
     public void endCall(PluginCall call) {
-        String callSid = call.getString("callSid");
+        // End call via the foreground service
+        Intent serviceIntent = new Intent(getSafeContext(), VoiceCallService.class);
+        serviceIntent.setAction(VoiceCallService.ACTION_END_CALL);
         
-        Call targetCall = null;
-        if (callSid != null) {
-            // Try to find by SID first
-            targetCall = activeCalls.get(callSid);
-            // If not found, try UUID format
-            if (targetCall == null) {
-                try {
-                    UUID callUuid = UUID.fromString(callSid);
-                    targetCall = callsByUuid.get(callUuid);
-                } catch (IllegalArgumentException e) {
-                    // Not a valid UUID, ignore
-                }
-            }
-        } else if (activeCall != null) {
-            targetCall = activeCall;
-        }
-        
-        if (targetCall != null) {
-            targetCall.disconnect();
+        try {
+            getSafeContext().startService(serviceIntent);
+            
             JSObject ret = new JSObject();
             ret.put("success", true);
             call.resolve(ret);
-        } else {
-            call.reject("No active call found");
+        } catch (Exception e) {
+            Log.e(TAG, "Error ending call via service", e);
+            call.reject("Failed to end call: " + e.getMessage());
         }
     }
 
     @PluginMethod
     public void muteCall(PluginCall call) {
         boolean muted = call.getBoolean("muted", false);
-        String callSid = call.getString("callSid");
         
-        Call targetCall = null;
-        if (callSid != null) {
-            // Try to find by SID first
-            targetCall = activeCalls.get(callSid);
-            // If not found, try UUID format
-            if (targetCall == null) {
-                try {
-                    UUID callUuid = UUID.fromString(callSid);
-                    targetCall = callsByUuid.get(callUuid);
-                } catch (IllegalArgumentException e) {
-                    // Not a valid UUID, ignore
-                }
-            }
-        } else if (activeCall != null) {
-            targetCall = activeCall;
-        }
+        // Mute call via the foreground service
+        Intent serviceIntent = new Intent(getSafeContext(), VoiceCallService.class);
+        serviceIntent.setAction(VoiceCallService.ACTION_MUTE_CALL);
+        serviceIntent.putExtra(VoiceCallService.EXTRA_MUTED, muted);
         
-        if (targetCall != null) {
-            targetCall.mute(muted);
+        try {
+            getSafeContext().startService(serviceIntent);
+            
             JSObject ret = new JSObject();
             ret.put("success", true);
             call.resolve(ret);
-        } else {
-            call.reject("No active call found");
+        } catch (Exception e) {
+            Log.e(TAG, "Error muting call via service", e);
+            call.reject("Failed to mute call: " + e.getMessage());
         }
     }
 
@@ -614,59 +744,20 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
     public void setSpeaker(PluginCall call) {
         boolean enabled = call.getBoolean("enabled", false);
         
-        if (audioSwitch != null) {
-            List<AudioDevice> availableDevices = audioSwitch.getAvailableAudioDevices();
-            AudioDevice targetDevice = null;
+        // Set speaker via the foreground service
+        Intent serviceIntent = new Intent(getSafeContext(), VoiceCallService.class);
+        serviceIntent.setAction(VoiceCallService.ACTION_SPEAKER_TOGGLE);
+        serviceIntent.putExtra(VoiceCallService.EXTRA_SPEAKER_ENABLED, enabled);
+        
+        try {
+            getSafeContext().startService(serviceIntent);
             
-            if (enabled) {
-                // Find speaker device by name
-                for (AudioDevice device : availableDevices) {
-                    String deviceName = device.getName().toLowerCase();
-                    if (deviceName.contains("speaker")) {
-                        targetDevice = device;
-                        break;
-                    }
-                }
-            } else {
-                // Find earpiece or wired headset (non-speaker) by name
-                for (AudioDevice device : availableDevices) {
-                    String deviceName = device.getName().toLowerCase();
-                    if (deviceName.contains("earpiece") || 
-                        deviceName.contains("wired") ||
-                        deviceName.contains("headset")) {
-                        targetDevice = device;
-                        break;
-                    }
-                }
-                
-                // If no earpiece/headset found, use the first non-speaker device
-                if (targetDevice == null) {
-                    for (AudioDevice device : availableDevices) {
-                        String deviceName = device.getName().toLowerCase();
-                        if (!deviceName.contains("speaker")) {
-                            targetDevice = device;
-                            break;
-                        }
-                    }
-                }
-            }
-            
-            if (targetDevice != null) {
-                audioSwitch.selectDevice(targetDevice);
-                Log.d(TAG, "Audio device switched to: " + targetDevice.getName());
-                
-                JSObject ret = new JSObject();
-                ret.put("success", true);
-                call.resolve(ret);
-            } else {
-                Log.w(TAG, "Target audio device not available");
-                JSObject ret = new JSObject();
-                ret.put("success", false);
-                ret.put("error", "Target audio device not available");
-                call.resolve(ret);
-            }
-        } else {
-            call.reject("AudioSwitch not initialized");
+            JSObject ret = new JSObject();
+            ret.put("success", true);
+            call.resolve(ret);
+        } catch (Exception e) {
+            Log.e(TAG, "Error setting speaker via service", e);
+            call.reject("Failed to set speaker: " + e.getMessage());
         }
     }
 
@@ -740,7 +831,8 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         }
     };
 
-    private final Call.Listener callListener = new Call.Listener() {
+    // Call handling is now done by VoiceCallService
+    /*private final Call.Listener callListener = new Call.Listener() {
         @Override
         public void onRinging(@NonNull Call call) {
             Log.d(TAG, "Call is ringing");
@@ -919,7 +1011,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             data.put("previousWarnings", previousWarningsArray);
             notifyListeners("callQualityWarningsChanged", data);
         }
-    };
+    };*/
 
     private void showIncomingCallNotification(CallInvite callInvite, String callSid) {
         try {
@@ -928,18 +1020,33 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
                 callerName = callerName.substring(7); // Remove "client:" prefix
             }
 
-            // Create intent for accepting the call - directly launch the app
-            Intent acceptIntent = new Intent(getSafeContext(), mainActivityClass);
-            acceptIntent.setAction(ACTION_ACCEPT_CALL);
-            acceptIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-            acceptIntent.putExtra("AUTO_ACCEPT_CALL", true);
-            acceptIntent.putExtra(EXTRA_CALL_SID, callSid);
-            PendingIntent acceptPendingIntent = PendingIntent.getActivity(
-                getSafeContext(), 
-                0, 
-                acceptIntent, 
-                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
-            );
+            // Create intent for accepting the call
+            PendingIntent acceptPendingIntent;
+            if (this.bridge == null) {
+                // App NOT running - launch new activity
+                Intent acceptIntent = new Intent(getSafeContext(), mainActivityClass);
+                acceptIntent.setAction(ACTION_ACCEPT_CALL);
+                acceptIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                acceptIntent.putExtra("AUTO_ACCEPT_CALL", true);
+                acceptIntent.putExtra(EXTRA_CALL_SID, callSid);
+                acceptPendingIntent = PendingIntent.getActivity(
+                    getSafeContext(), 
+                    0, 
+                    acceptIntent, 
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+                );
+            } else {
+                // App IS running - use BroadcastReceiver to communicate with existing activity
+                Intent acceptIntent = new Intent(getSafeContext(), NotificationActionReceiver.class);
+                acceptIntent.setAction(ACTION_ACCEPT_CALL);
+                acceptIntent.putExtra(EXTRA_CALL_SID, callSid);
+                acceptPendingIntent = PendingIntent.getBroadcast(
+                    getSafeContext(), 
+                    0, 
+                    acceptIntent, 
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+                );
+            }
 
             // Create intent for rejecting the call
             Intent rejectIntent = new Intent(getSafeContext(), NotificationActionReceiver.class);
@@ -957,6 +1064,8 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             fullScreenIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
             fullScreenIntent.putExtra("INCOMING_CALL", true);
             fullScreenIntent.putExtra(EXTRA_CALL_SID, callSid);
+            fullScreenIntent.putExtra("CALLER_NAME", callerName);
+            fullScreenIntent.putExtra("CALL_FROM", callInvite.getFrom());
             PendingIntent fullScreenPendingIntent = PendingIntent.getActivity(
                 getSafeContext(), 
                 2, 
@@ -1072,22 +1181,24 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         
         CallInvite callInvite = activeCallInvites.get(callSid);
         if (callInvite != null) {
-            // Dismiss notification and stop sounds
-            dismissIncomingCallNotification();
+            // Accept call via the foreground service
+            Intent serviceIntent = new Intent(getSafeContext(), VoiceCallService.class);
+            serviceIntent.setAction(VoiceCallService.ACTION_ACCEPT_CALL);
+            serviceIntent.putExtra(VoiceCallService.EXTRA_CALL_INVITE, callInvite);
+            serviceIntent.putExtra(VoiceCallService.EXTRA_ACCESS_TOKEN, accessToken);
             
-            // Accept the call - this will trigger the normal call flow
-            Call acceptedCall = callInvite.accept(getSafeContext(), callListener);
-            if (acceptedCall != null) {
-                activeCall = acceptedCall;
-                activeCallInvites.remove(callSid);
-                Log.d(TAG, "Call accepted from notification, waiting for onConnected callback");
-            } else {
-                Log.e(TAG, "Failed to accept call from notification");
+            try {
+                getSafeContext().startForegroundService(serviceIntent);
+                Log.d(TAG, "Call acceptance started via service");
+            } catch (Exception e) {
+                Log.e(TAG, "Error accepting call via service", e);
             }
         } else {
             Log.e(TAG, "Call invite not found for SID: " + callSid);
         }
     }
+
+
 
     public void rejectCallFromNotification(String callSid) {
         Log.d(TAG, "Rejecting call from notification: " + callSid);

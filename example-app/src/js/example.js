@@ -475,11 +475,16 @@ class TwilioVoiceApp {
   async handleIncomingCall(data) {
     console.log(`Incoming call from ${data.from} (callSid: ${data.callSid})`);
     
+    if (data.openedFromNotification) {
+      console.log('App was opened from incoming call notification');
+      this.showStatus('Incoming call...', 'info');
+    }
+    
     // Store the pending call invite
     this.pendingCallInvite = data;
     
     // Show the incoming call screen
-    this.showIncomingCallScreen(data.from);
+    this.showIncomingCallScreen(data.callerName || data.from);
   }
 
   showIncomingCallScreen(callerName) {

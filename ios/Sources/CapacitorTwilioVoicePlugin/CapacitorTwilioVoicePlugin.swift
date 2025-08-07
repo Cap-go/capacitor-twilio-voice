@@ -93,6 +93,9 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
     
     private func setupAudioDevice() {
         TwilioVoiceSDK.audioDevice = audioDevice
+        
+        // Set default audio routing to earpiece (not speaker)
+        toggleAudioRoute(toSpeaker: false)
     }
     
     private func isTokenValid(_ token: String) -> Bool {
@@ -752,6 +755,9 @@ extension CapacitorTwilioVoicePlugin: CallDelegate {
     public func callDidStartRinging(call: Call) {
         notifyListeners("callRinging", data: ["callSid": call.uuid!.uuidString])
         
+        // Ensure audio is routed to earpiece during ringing (not speaker)
+        toggleAudioRoute(toSpeaker: false)
+        
         if playCustomRingback {
             playRingback()
         }
@@ -766,7 +772,8 @@ extension CapacitorTwilioVoicePlugin: CallDelegate {
             completion(true)
         }
         
-        toggleAudioRoute(toSpeaker: true)
+        // Don't force speaker on - maintain current audio routing preference
+        // toggleAudioRoute(toSpeaker: true) // Removed - this was forcing speaker on
         notifyListeners("callConnected", data: ["callSid": call.uuid!.uuidString])
     }
 

@@ -10,6 +10,7 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
 
     <application>
         <!-- Firebase Messaging Service for Twilio Voice -->
@@ -30,6 +31,13 @@
                 <action android:name="ACTION_REJECT_CALL" />
             </intent-filter>
         </receiver>
+
+        <!-- Voice Call Foreground Service -->
+        <service
+            android:name="ee.forgr.capacitor_twilio_voice.VoiceCallService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
     </application>
 
 </manifest>
