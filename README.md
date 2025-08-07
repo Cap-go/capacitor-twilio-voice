@@ -11,24 +11,33 @@ npx cap sync
 
 ## iOS Setup
 
-### 1. Install Dependencies
+### 1. Install the plugin
 
-#### Option A: CocoaPods (Recommended)
-Add to your app's `ios/App/Podfile`:
-```ruby
-pod 'TwilioVoice', '~> 6.13'
+```bash
+npm install @capgo/capacitor-twilio-voice
+npx cap sync
 ```
 
-#### Option B: Swift Package Manager  
-Add to your `Package.swift`:
-```swift
-dependencies: [
-    .package(url: "https://github.com/twilio/twilio-voice-ios", from: "6.13.0")
-]
+### 2. Setup `CustomCapacitorViewController.swift`
+
+Copy the code from `example-app/ios/App/App/CustomCapacitorViewController.swift` to your `ios/App/App/CustomCapacitorViewController.swift` file.
+
+
+### 3. Edit `Main.storyboard`
+
+Change the view controller to `CustomCapacitorViewController` in `Main.storyboard`.
+
+```xml
+<viewController id="BYZ-38-t0r" customClass="CustomCapacitorViewController" customModule="App" customModuleProvider="target" sceneMemberID="viewController"/>
 ```
 
-### 2. Configure Info.plist
-Add to `ios/App/App/Info.plist`:
+Look in the example app for more details.
+
+
+### 4. Setup `Info.plist`
+
+Add the following to `ios/App/App/Info.plist`:
+
 ```xml
 <key>NSMicrophoneUsageDescription</key>
 <string>This app uses the microphone for voice calls</string>
@@ -40,11 +49,10 @@ Add to `ios/App/App/Info.plist`:
 </array>
 ```
 
-### 3. Enable Push Notifications Capability
-In Xcode, select your app target → Signing & Capabilities → Add Capability → Push Notifications
+5. Make sure you have the following capabilities enabled in Xcode:
 
-### 4. PushKit Setup
-PushKit is automatically configured by the plugin. No additional setup required.
+- Push Notifications
+- Background Modes
 
 ## Android Setup
 
@@ -52,54 +60,39 @@ PushKit is automatically configured by the plugin. No additional setup required.
 Add Firebase to your Android project:
 
 1. Add `google-services.json` to `android/app/`
-2. Update `android/app/build.gradle`:
-```gradle
-apply plugin: 'com.google.gms.google-services'
 
-dependencies {
-    // ... existing dependencies
-    implementation 'com.google.firebase:firebase-messaging:25.0.0'
-    implementation platform('com.google.firebase:firebase-bom:34.0.0')
-    implementation 'com.twilio:audioswitch:1.2.2'
-    implementation 'androidx.core:core:1.13.1'
-    implementation 'androidx.media:media:1.6.0'
-}
+2. Install `patch-package`
+
+```bash
+npm install patch-package
+```
+3. Hack capacitor by copying the patch from `example-app/patches/@capacitor+android+7.0.0.patch` to the `patches` folder of your app.
+
+4. Run `patch-package`
+
+```bash
+npx patch-package
 ```
 
-3. Update project-level `android/build.gradle`:
-```gradle
-buildscript {
-    dependencies {
-        classpath 'com.google.gms:google-services:4.4.2'
-    }
-}
+5. Add `CapacitorApplication.java` to `android/app/src/main/java/YOUR_APP_PACKAGE/CapacitorApplication.java`
+Copy the content of `example-app/android/app/src/main/java/com/example/plugin/CapacitorApplication.java` to your `android/app/src/main/java/YOUR_APP_PACKAGE/CapacitorApplication.java` file.
+
+6. Add `android:name="CapacitorApplication"` to the `application` tag in `android/app/src/main/AndroidManifest.xml`
+
+7. Add the following to `android/app/src/main/AndroidManifest.xml`:
+
+```xml
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.TURN_SCREEN_ON" />
+    <uses-permission android:name="android.permission.SHOW_WHEN_LOCKED" />
 ```
 
-### 2. AndroidManifest.xml
-Required permissions are automatically added by the plugin:
-- `RECORD_AUDIO`
-- `INTERNET` 
-- `ACCESS_NETWORK_STATE`
-- `WAKE_LOCK`
-- `USE_FULL_SCREEN_INTENT`
-- `VIBRATE`
-- `SYSTEM_ALERT_WINDOW`
-- `FOREGROUND_SERVICE`
+Keep in mind, this will make it so that you app can be accessed when the screen is locked.
 
-### 3. Firebase Messaging Service
-The plugin automatically registers a Firebase Messaging Service to handle incoming calls.
+## Twilio Setup
 
-### 4. Android Notification Features 📱
-The Android implementation includes comprehensive notification support:
-
-- **🔔 System Notifications**: Incoming calls appear as proper Android notifications with caller information
-- **📱 Full-Screen Intent**: Calls can launch the app on lock screen for immediate visibility
-- **🎵 Ringtone & Vibration**: Uses system default ringtone with vibration pattern for audio/haptic alerts
-- **⚡ Action Buttons**: Accept/Reject buttons directly in notification for quick response
-- **🔕 Auto-Dismiss**: Notifications automatically clear when calls end or are answered
-- **🌙 Do Not Disturb**: Respects system notification settings and priority modes
-
-**Note**: Notification functionality requires notification permissions. The app will request these permissions during login if not already granted.
+ - [iOS Setup](https://www.twilio.com/docs/voice/sdks/ios/get-started)
+ - [Android Setup](https://www.twilio.com/docs/voice/sdks/android/get-started)
 
 ## Usage
 
