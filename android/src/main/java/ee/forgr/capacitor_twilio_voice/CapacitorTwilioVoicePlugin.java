@@ -12,24 +12,22 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
-import android.os.IBinder;
 import android.media.AudioAttributes;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
+import android.os.IBinder;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
+import android.util.Base64;
 import android.util.Log;
-
-import androidx.core.app.NotificationCompat;
-import androidx.core.app.NotificationManagerCompat;
-
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.app.ActivityCompat;
-
+import androidx.core.app.NotificationCompat;
+import androidx.core.app.NotificationManagerCompat;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -40,6 +38,8 @@ import com.getcapacitor.annotation.Permission;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.messaging.FirebaseMessaging;
+import com.twilio.audioswitch.AudioDevice;
+import com.twilio.audioswitch.AudioSwitch;
 import com.twilio.voice.Call;
 import com.twilio.voice.CallException;
 import com.twilio.voice.CallInvite;
@@ -49,48 +49,43 @@ import com.twilio.voice.RegistrationException;
 import com.twilio.voice.RegistrationListener;
 import com.twilio.voice.UnregistrationListener;
 import com.twilio.voice.Voice;
-
-import com.twilio.audioswitch.AudioDevice;
-import com.twilio.audioswitch.AudioSwitch;
-
-import org.json.JSONException;
-import org.json.JSONObject;
-
-import android.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 @CapacitorPlugin(
     name = "CapacitorTwilioVoice",
     permissions = {
-        @Permission(strings = {Manifest.permission.RECORD_AUDIO}),
-        @Permission(strings = {Manifest.permission.WAKE_LOCK}),
-        @Permission(strings = {Manifest.permission.USE_FULL_SCREEN_INTENT})
+        @Permission(strings = { Manifest.permission.RECORD_AUDIO }),
+        @Permission(strings = { Manifest.permission.WAKE_LOCK }),
+        @Permission(strings = { Manifest.permission.USE_FULL_SCREEN_INTENT })
     }
 )
 public class CapacitorTwilioVoicePlugin extends Plugin {
+
     private static final String TAG = "CapacitorTwilioVoice";
     private static final String PREF_ACCESS_TOKEN = "twilio_access_token";
     private static final String PREF_FCM_TOKEN = "twilio_fcm_token";
-    
+
     public static CapacitorTwilioVoicePlugin instance;
-    
+
     private String accessToken;
     private String fcmToken;
     private Map<String, CallInvite> activeCallInvites = new HashMap<>();
     private Map<String, Call> activeCalls = new HashMap<>();
     private Map<UUID, Call> callsByUuid = new HashMap<>();
     private Call activeCall;
-    
+
     private AudioSwitch audioSwitch;
 
     private Context injectedContext;
 
     private Class<?> mainActivityClass;
-    
+
     // Notification and sound management
     private static final String NOTIFICATION_CHANNEL_ID = "twilio_voice_channel";
     private static final String NOTIFICATION_CHANNEL_NAME = "Twilio Voice Calls";
@@ -98,14 +93,14 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
     private static final String ACTION_ACCEPT_CALL = "ACTION_ACCEPT_CALL";
     private static final String ACTION_REJECT_CALL = "ACTION_REJECT_CALL";
     private static final String EXTRA_CALL_SID = "EXTRA_CALL_SID";
-    
+
     private MediaPlayer ringtonePlayer;
     private Vibrator vibrator;
-    
+
     // Voice Call Service
     private VoiceCallService voiceCallService;
     private boolean isServiceBound = false;
-    
+
     private final ServiceConnection serviceConnection = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
@@ -113,7 +108,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             VoiceCallService.VoiceCallBinder binder = (VoiceCallService.VoiceCallBinder) service;
             voiceCallService = binder.getService();
             isServiceBound = true;
-            
+
             // Set up service listener to relay events to JavaScript
             voiceCallService.setServiceListener(serviceListener);
         }
@@ -125,14 +120,14 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             isServiceBound = false;
         }
     };
-    
+
     // Service listener to relay events from the service to JavaScript
     private final VoiceCallService.VoiceCallServiceListener serviceListener = new VoiceCallService.VoiceCallServiceListener() {
         @Override
         public void onCallConnected(Call call) {
             activeCall = call;
             activeCalls.put(call.getSid(), call);
-            
+
             JSObject data = new JSObject();
             data.put("callSid", call.getSid());
             notifyListeners("callConnected", data);
@@ -142,7 +137,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         public void onCallDisconnected(Call call, CallException error) {
             activeCall = null;
             activeCalls.remove(call.getSid());
-            
+
             JSObject data = new JSObject();
             data.put("callSid", call.getSid());
             if (error != null) {
@@ -176,17 +171,21 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         }
 
         @Override
-        public void onCallQualityWarningsChanged(Call call, Set<Call.CallQualityWarning> currentWarnings, Set<Call.CallQualityWarning> previousWarnings) {
+        public void onCallQualityWarningsChanged(
+            Call call,
+            Set<Call.CallQualityWarning> currentWarnings,
+            Set<Call.CallQualityWarning> previousWarnings
+        ) {
             JSObject data = new JSObject();
             data.put("callSid", call.getSid());
-            
+
             // Convert warnings to string array
             JSArray currentWarningsArray = new JSArray();
             for (Call.CallQualityWarning warning : currentWarnings) {
                 currentWarningsArray.put(warning.name());
             }
             data.put("currentWarnings", currentWarningsArray);
-            
+
             notifyListeners("callQualityWarningsChanged", data);
         }
 
@@ -205,46 +204,46 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
     @Override
     public void load() {
         super.load();
-        
+
         // Set instance for Firebase messaging service
         instance = this;
-        
+
         // Load stored access token
         SharedPreferences prefs = getSafeContext().getSharedPreferences("CapacitorTwilioVoice", Context.MODE_PRIVATE);
         accessToken = prefs.getString(PREF_ACCESS_TOKEN, null);
-        
+
         // Initialize FCM and register for push notifications
         initializeFCM();
-        
+
         // Initialize AudioSwitch
         initializeAudioSwitch();
-        
+
         // Initialize notification system
         initializeNotifications();
-        
+
         // Initialize sound and vibration
         initializeSoundAndVibration();
-        
+
         // Check if app was launched to auto-accept a call
         checkForAutoAcceptCall();
-        
+
         // Check if app was launched due to an incoming call notification
         checkForIncomingCallNotification();
-        
+
         // Bind to the VoiceCallService
         bindToVoiceCallService();
-        
+
         Log.d(TAG, "CapacitorTwilioVoice plugin loaded");
     }
-    
+
     private void bindToVoiceCallService() {
         Intent intent = new Intent(getSafeContext(), VoiceCallService.class);
         getSafeContext().bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
         Log.d(TAG, "Binding to VoiceCallService");
     }
-    
+
     // Service cleanup is handled when the activity is destroyed
-    
+
     private void checkForAutoAcceptCall() {
         try {
             Activity activity = getActivity();
@@ -252,24 +251,27 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
                 Intent intent = activity.getIntent();
                 if (intent != null) {
                     // Check for auto-accept flag OR accept action
-                    boolean shouldAutoAccept = intent.getBooleanExtra("AUTO_ACCEPT_CALL", false) || 
-                                             ACTION_ACCEPT_CALL.equals(intent.getAction());
-                    
+                    boolean shouldAutoAccept =
+                        intent.getBooleanExtra("AUTO_ACCEPT_CALL", false) || ACTION_ACCEPT_CALL.equals(intent.getAction());
+
                     if (shouldAutoAccept) {
                         String callSid = intent.getStringExtra(EXTRA_CALL_SID);
                         Log.d(TAG, "App launched with auto-accept for call: " + callSid + " (action: " + intent.getAction() + ")");
-                        
+
                         if (callSid != null) {
                             // Clear the intent extras and action to prevent repeated auto-accept
                             intent.removeExtra("AUTO_ACCEPT_CALL");
                             intent.removeExtra(EXTRA_CALL_SID);
                             intent.setAction(null);
-                            
+
                             // Delay the auto-accept slightly to ensure plugin is fully loaded
-                            new android.os.Handler().postDelayed(() -> {
-                                Log.d(TAG, "Auto-accepting call: " + callSid);
-                                acceptCallFromNotification(callSid);
-                            }, 500);
+                            new android.os.Handler().postDelayed(
+                                    () -> {
+                                        Log.d(TAG, "Auto-accepting call: " + callSid);
+                                        acceptCallFromNotification(callSid);
+                                    },
+                                    500
+                                );
                         }
                     }
                 }
@@ -278,7 +280,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             Log.e(TAG, "Error checking for auto-accept call", e);
         }
     }
-    
+
     private void checkForIncomingCallNotification() {
         try {
             Activity activity = getActivity();
@@ -288,32 +290,35 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
                     String callSid = intent.getStringExtra(EXTRA_CALL_SID);
                     String callerName = intent.getStringExtra("CALLER_NAME");
                     String callFrom = intent.getStringExtra("CALL_FROM");
-                    
+
                     Log.d(TAG, "App opened via incoming call notification: " + callSid + " from: " + callFrom);
-                    
+
                     if (callSid != null && callFrom != null) {
                         // Clear the intent extras to prevent repeated notifications
                         intent.removeExtra("INCOMING_CALL");
                         intent.removeExtra(EXTRA_CALL_SID);
                         intent.removeExtra("CALLER_NAME");
                         intent.removeExtra("CALL_FROM");
-                        
+
                         // Check if we still have the call invite
                         CallInvite callInvite = activeCallInvites.get(callSid);
                         if (callInvite != null) {
                             // Delay sending the event to ensure JavaScript is ready
-                            new android.os.Handler().postDelayed(() -> {
-                                Log.d(TAG, "Sending incoming call event to JavaScript: " + callSid);
-                                
-                                JSObject data = new JSObject();
-                                data.put("callSid", callSid);
-                                data.put("from", callFrom);
-                                data.put("to", callInvite.getTo());
-                                data.put("callerName", callerName != null ? callerName : callFrom);
-                                data.put("openedFromNotification", true);
-                                
-                                notifyListeners("callInviteReceived", data);
-                            }, 1000); // Give JavaScript more time to initialize
+                            new android.os.Handler().postDelayed(
+                                    () -> {
+                                        Log.d(TAG, "Sending incoming call event to JavaScript: " + callSid);
+
+                                        JSObject data = new JSObject();
+                                        data.put("callSid", callSid);
+                                        data.put("from", callFrom);
+                                        data.put("to", callInvite.getTo());
+                                        data.put("callerName", callerName != null ? callerName : callFrom);
+                                        data.put("openedFromNotification", true);
+
+                                        notifyListeners("callInviteReceived", data);
+                                    },
+                                    1000
+                                ); // Give JavaScript more time to initialize
                         } else {
                             Log.w(TAG, "Call invite not found for SID: " + callSid + " (may have been cancelled)");
                         }
@@ -328,20 +333,20 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
     @Override
     protected void handleOnDestroy() {
         super.handleOnDestroy();
-        
+
         // Clean up AudioSwitch
         if (audioSwitch != null) {
             audioSwitch.stop();
             audioSwitch = null;
         }
-        
+
         // Clean up ringtone and notifications
         stopRingtone();
         dismissIncomingCallNotification();
-        
+
         // Clear plugin instance
         instance = null;
-        
+
         Log.d(TAG, "CapacitorTwilioVoice plugin destroyed");
     }
 
@@ -364,7 +369,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             channel.enableLights(true);
             channel.enableVibration(true);
             channel.setLockscreenVisibility(NotificationCompat.VISIBILITY_PUBLIC);
-            
+
             NotificationManager notificationManager = getSafeContext().getSystemService(NotificationManager.class);
             if (notificationManager != null) {
                 notificationManager.createNotificationChannel(channel);
@@ -391,7 +396,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             if (ringtonePlayer != null) {
                 stopRingtone();
             }
-            
+
             Uri ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
             ringtonePlayer = new MediaPlayer();
             ringtonePlayer.setDataSource(getSafeContext(), ringtoneUri);
@@ -399,17 +404,17 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             ringtonePlayer.setLooping(true);
             ringtonePlayer.prepare();
             ringtonePlayer.start();
-            
+
             // Start vibration pattern
             if (vibrator != null && vibrator.hasVibrator()) {
-                long[] pattern = {0, 1000, 1000}; // Wait 0ms, vibrate 1000ms, wait 1000ms
+                long[] pattern = { 0, 1000, 1000 }; // Wait 0ms, vibrate 1000ms, wait 1000ms
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     vibrator.vibrate(VibrationEffect.createWaveform(pattern, 0));
                 } else {
                     vibrator.vibrate(pattern, 0);
                 }
             }
-            
+
             Log.d(TAG, "Started ringtone and vibration");
         } catch (Exception e) {
             Log.e(TAG, "Error starting ringtone: " + e.getMessage(), e);
@@ -425,11 +430,11 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
                 ringtonePlayer.release();
                 ringtonePlayer = null;
             }
-            
+
             if (vibrator != null) {
                 vibrator.cancel();
             }
-            
+
             Log.d(TAG, "Stopped ringtone and vibration");
         } catch (Exception e) {
             Log.e(TAG, "Error stopping ringtone: " + e.getMessage(), e);
@@ -437,43 +442,46 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
     }
 
     private void initializeFCM() {
-        FirebaseMessaging.getInstance().getToken()
-            .addOnCompleteListener(new OnCompleteListener<String>() {
-                @Override
-                public void onComplete(@NonNull Task<String> task) {
-                    if (!task.isSuccessful()) {
-                        Log.w(TAG, "Fetching FCM registration token failed", task.getException());
-                        return;
-                    }
+        FirebaseMessaging.getInstance()
+            .getToken()
+            .addOnCompleteListener(
+                new OnCompleteListener<String>() {
+                    @Override
+                    public void onComplete(@NonNull Task<String> task) {
+                        if (!task.isSuccessful()) {
+                            Log.w(TAG, "Fetching FCM registration token failed", task.getException());
+                            return;
+                        }
 
-                    // Get new FCM registration token
-                    fcmToken = task.getResult();
-                    Log.d(TAG, "FCM Registration Token: " + fcmToken);
-                    
-                    // Store FCM token
-                    SharedPreferences prefs = getSafeContext().getSharedPreferences("CapacitorTwilioVoice", Context.MODE_PRIVATE);
-                    prefs.edit().putString(PREF_FCM_TOKEN, fcmToken).apply();
-                    
-                    // Register with Twilio if we have an access token
-                    if (accessToken != null && isTokenValid(accessToken)) {
-                        performRegistration();
+                        // Get new FCM registration token
+                        fcmToken = task.getResult();
+                        Log.d(TAG, "FCM Registration Token: " + fcmToken);
+
+                        // Store FCM token
+                        SharedPreferences prefs = getSafeContext().getSharedPreferences("CapacitorTwilioVoice", Context.MODE_PRIVATE);
+                        prefs.edit().putString(PREF_FCM_TOKEN, fcmToken).apply();
+
+                        // Register with Twilio if we have an access token
+                        if (accessToken != null && isTokenValid(accessToken)) {
+                            performRegistration();
+                        }
                     }
                 }
-            });
+            );
     }
 
     private boolean isTokenValid(String token) {
         try {
             String[] parts = token.split("\\.");
             if (parts.length != 3) return false;
-            
+
             // Use Android's Base64 (available since API 8) instead of Java's (API 26+)
             String payload = new String(Base64.decode(parts[1], Base64.DEFAULT));
             JSONObject json = new JSONObject(payload);
-            
+
             long exp = json.getLong("exp");
             long currentTime = System.currentTimeMillis() / 1000;
-            
+
             return currentTime < exp;
         } catch (Exception e) {
             Log.e(TAG, "Error validating token", e);
@@ -486,7 +494,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             Log.w(TAG, "Cannot register: missing access token or FCM token");
             return;
         }
-        
+
         Voice.register(accessToken, Voice.RegistrationChannel.FCM, fcmToken, registrationListener);
     }
 
@@ -511,22 +519,22 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             call.reject("accessToken is required");
             return;
         }
-        
+
         if (!isTokenValid(token)) {
             call.reject("Invalid or expired access token");
             return;
         }
-        
+
         // Store access token
         accessToken = token;
         SharedPreferences prefs = getSafeContext().getSharedPreferences("CapacitorTwilioVoice", Context.MODE_PRIVATE);
         prefs.edit().putString(PREF_ACCESS_TOKEN, token).apply();
-        
+
         Log.d(TAG, "Access token stored and validated successfully");
-        
+
         // Perform registration
         performRegistration();
-        
+
         JSObject ret = new JSObject();
         ret.put("success", true);
         call.resolve(ret);
@@ -535,19 +543,19 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
     @PluginMethod
     public void logout(PluginCall call) {
         Log.d(TAG, "Logging out and clearing stored credentials");
-        
+
         // Unregister from Twilio
         if (accessToken != null && fcmToken != null) {
             Voice.unregister(accessToken, Voice.RegistrationChannel.FCM, fcmToken, unregistrationListener);
         }
-        
+
         // Clear stored tokens
         SharedPreferences prefs = getSafeContext().getSharedPreferences("CapacitorTwilioVoice", Context.MODE_PRIVATE);
         prefs.edit().remove(PREF_ACCESS_TOKEN).remove(PREF_FCM_TOKEN).apply();
-        
+
         // Clear instance variables
         accessToken = null;
-        
+
         // End any active calls
         for (Call call1 : activeCalls.values()) {
             call1.disconnect();
@@ -559,14 +567,14 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         callsByUuid.clear();
         activeCallInvites.clear();
         activeCall = null;
-        
+
         // Deactivate AudioSwitch
         if (audioSwitch != null) {
             audioSwitch.deactivate();
         }
-        
+
         Log.d(TAG, "Logout completed successfully");
-        
+
         JSObject ret = new JSObject();
         ret.put("success", true);
         call.resolve(ret);
@@ -576,15 +584,15 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
     public void isLoggedIn(PluginCall call) {
         boolean isLoggedIn = false;
         String identity = null;
-        
+
         if (accessToken != null) {
             isLoggedIn = isTokenValid(accessToken);
-            
+
             if (isLoggedIn) {
                 identity = extractIdentityFromToken(accessToken);
             }
         }
-        
+
         JSObject ret = new JSObject();
         ret.put("isLoggedIn", isLoggedIn);
         ret.put("hasValidToken", isLoggedIn);
@@ -598,12 +606,12 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         try {
             String[] parts = token.split("\\.");
             if (parts.length != 3) return null;
-            
+
             // Use Android's Base64 (available since API 8) instead of Java's (API 26+)
             String payload = new String(Base64.decode(parts[1], Base64.DEFAULT));
             JSONObject json = new JSONObject(payload);
             JSONObject grants = json.getJSONObject("grants");
-            
+
             return grants.optString("identity", null);
         } catch (Exception e) {
             Log.e(TAG, "Error extracting identity from token", e);
@@ -617,21 +625,21 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             call.reject("No access token available. Please call login() first.");
             return;
         }
-        
+
         String to = call.getString("to");
         if (to == null) {
             to = ""; // Empty string for echo test
         }
-        
+
         // Start call via the foreground service
         Intent serviceIntent = new Intent(getSafeContext(), VoiceCallService.class);
         serviceIntent.setAction(VoiceCallService.ACTION_START_CALL);
         serviceIntent.putExtra(VoiceCallService.EXTRA_CALL_TO, to);
         serviceIntent.putExtra(VoiceCallService.EXTRA_ACCESS_TOKEN, accessToken);
-        
+
         try {
             getSafeContext().startForegroundService(serviceIntent);
-            
+
             JSObject ret = new JSObject();
             ret.put("success", true);
             ret.put("callSid", "pending"); // Will be updated when service connects
@@ -651,22 +659,22 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             call.reject("callSid is required");
             return;
         }
-        
+
         CallInvite callInvite = activeCallInvites.get(callSid);
         if (callInvite == null) {
             call.reject("No pending call invite found");
             return;
         }
-        
+
         // Accept call via the foreground service
         Intent serviceIntent = new Intent(getSafeContext(), VoiceCallService.class);
         serviceIntent.setAction(VoiceCallService.ACTION_ACCEPT_CALL);
         serviceIntent.putExtra(VoiceCallService.EXTRA_CALL_INVITE, callInvite);
         serviceIntent.putExtra(VoiceCallService.EXTRA_ACCESS_TOKEN, accessToken);
-        
+
         try {
             getSafeContext().startForegroundService(serviceIntent);
-            
+
             JSObject ret = new JSObject();
             ret.put("success", true);
             call.resolve(ret);
@@ -683,19 +691,19 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             call.reject("callSid is required");
             return;
         }
-        
+
         CallInvite callInvite = activeCallInvites.get(callSid);
         if (callInvite == null) {
             call.reject("No pending call invite found");
             return;
         }
-        
+
         // Dismiss notification and stop sounds
         dismissIncomingCallNotification();
-        
+
         callInvite.reject(getSafeContext());
         activeCallInvites.remove(callSid);
-        
+
         JSObject ret = new JSObject();
         ret.put("success", true);
         call.resolve(ret);
@@ -706,10 +714,10 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         // End call via the foreground service
         Intent serviceIntent = new Intent(getSafeContext(), VoiceCallService.class);
         serviceIntent.setAction(VoiceCallService.ACTION_END_CALL);
-        
+
         try {
             getSafeContext().startService(serviceIntent);
-            
+
             JSObject ret = new JSObject();
             ret.put("success", true);
             call.resolve(ret);
@@ -722,15 +730,15 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
     @PluginMethod
     public void muteCall(PluginCall call) {
         boolean muted = call.getBoolean("muted", false);
-        
+
         // Mute call via the foreground service
         Intent serviceIntent = new Intent(getSafeContext(), VoiceCallService.class);
         serviceIntent.setAction(VoiceCallService.ACTION_MUTE_CALL);
         serviceIntent.putExtra(VoiceCallService.EXTRA_MUTED, muted);
-        
+
         try {
             getSafeContext().startService(serviceIntent);
-            
+
             JSObject ret = new JSObject();
             ret.put("success", true);
             call.resolve(ret);
@@ -743,15 +751,15 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
     @PluginMethod
     public void setSpeaker(PluginCall call) {
         boolean enabled = call.getBoolean("enabled", false);
-        
+
         // Set speaker via the foreground service
         Intent serviceIntent = new Intent(getSafeContext(), VoiceCallService.class);
         serviceIntent.setAction(VoiceCallService.ACTION_SPEAKER_TOGGLE);
         serviceIntent.putExtra(VoiceCallService.EXTRA_SPEAKER_ENABLED, enabled);
-        
+
         try {
             getSafeContext().startService(serviceIntent);
-            
+
             JSObject ret = new JSObject();
             ret.put("success", true);
             call.resolve(ret);
@@ -764,7 +772,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
     @PluginMethod
     public void getCallStatus(PluginCall call) {
         JSObject ret = new JSObject();
-        
+
         if (activeCall != null) {
             ret.put("hasActiveCall", true);
             String callSid = activeCall.getSid();
@@ -774,7 +782,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         } else {
             ret.put("hasActiveCall", false);
         }
-        
+
         ret.put("pendingInvites", activeCallInvites.size());
         ret.put("activeCallsCount", activeCalls.size() + callsByUuid.size());
         call.resolve(ret);
@@ -782,9 +790,9 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
 
     @PluginMethod
     public void checkMicrophonePermission(PluginCall call) {
-        boolean hasPermission = ActivityCompat.checkSelfPermission(getSafeContext(), 
-            Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
-        
+        boolean hasPermission =
+            ActivityCompat.checkSelfPermission(getSafeContext(), Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
+
         JSObject ret = new JSObject();
         ret.put("granted", hasPermission);
         call.resolve(ret);
@@ -800,17 +808,16 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         @Override
         public void onRegistered(@NonNull String accessToken, @NonNull String fcmToken) {
             Log.d(TAG, "Successfully registered for VoIP push notifications");
-            
+
             JSObject data = new JSObject();
             data.put("fcmToken", fcmToken);
             notifyListeners("registrationSuccess", data);
         }
 
         @Override
-        public void onError(@NonNull RegistrationException registrationException, 
-                          @NonNull String accessToken, @NonNull String fcmToken) {
+        public void onError(@NonNull RegistrationException registrationException, @NonNull String accessToken, @NonNull String fcmToken) {
             Log.e(TAG, "Registration error: " + registrationException.getMessage());
-            
+
             JSObject data = new JSObject();
             data.put("error", registrationException.getMessage());
             data.put("code", registrationException.getErrorCode());
@@ -825,8 +832,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         }
 
         @Override
-        public void onError(@NonNull RegistrationException registrationException, 
-                          @NonNull String accessToken, @NonNull String fcmToken) {
+        public void onError(@NonNull RegistrationException registrationException, @NonNull String accessToken, @NonNull String fcmToken) {
             Log.e(TAG, "Unregistration error: " + registrationException.getMessage());
         }
     };
@@ -1030,9 +1036,9 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
                 acceptIntent.putExtra("AUTO_ACCEPT_CALL", true);
                 acceptIntent.putExtra(EXTRA_CALL_SID, callSid);
                 acceptPendingIntent = PendingIntent.getActivity(
-                    getSafeContext(), 
-                    0, 
-                    acceptIntent, 
+                    getSafeContext(),
+                    0,
+                    acceptIntent,
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
                 );
             } else {
@@ -1041,9 +1047,9 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
                 acceptIntent.setAction(ACTION_ACCEPT_CALL);
                 acceptIntent.putExtra(EXTRA_CALL_SID, callSid);
                 acceptPendingIntent = PendingIntent.getBroadcast(
-                    getSafeContext(), 
-                    0, 
-                    acceptIntent, 
+                    getSafeContext(),
+                    0,
+                    acceptIntent,
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
                 );
             }
@@ -1053,9 +1059,9 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             rejectIntent.setAction(ACTION_REJECT_CALL);
             rejectIntent.putExtra(EXTRA_CALL_SID, callSid);
             PendingIntent rejectPendingIntent = PendingIntent.getBroadcast(
-                getSafeContext(), 
-                1, 
-                rejectIntent, 
+                getSafeContext(),
+                1,
+                rejectIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
             );
 
@@ -1067,26 +1073,23 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             fullScreenIntent.putExtra("CALLER_NAME", callerName);
             fullScreenIntent.putExtra("CALL_FROM", callInvite.getFrom());
             PendingIntent fullScreenPendingIntent = PendingIntent.getActivity(
-                getSafeContext(), 
-                2, 
-                fullScreenIntent, 
+                getSafeContext(),
+                2,
+                fullScreenIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
             );
 
             // Create Person object for the caller
-            androidx.core.app.Person caller = new androidx.core.app.Person.Builder()
-                .setName(callerName)
-                .setImportant(true)
-                .build();
+            androidx.core.app.Person caller = new androidx.core.app.Person.Builder().setName(callerName).setImportant(true).build();
 
             // Create CallStyle notification with proper colored buttons
             NotificationCompat.CallStyle callStyle = NotificationCompat.CallStyle.forIncomingCall(
-                caller,              // person (caller as Person object)
+                caller, // person (caller as Person object)
                 rejectPendingIntent, // decline intent
-                acceptPendingIntent  // answer intent
+                acceptPendingIntent // answer intent
             )
-            .setAnswerButtonColorHint(0xFF4CAF50)    // Green color for accept button
-            .setDeclineButtonColorHint(0xFFF44336);  // Red color for reject button
+                .setAnswerButtonColorHint(0xFF4CAF50) // Green color for accept button
+                .setDeclineButtonColorHint(0xFFF44336); // Red color for reject button
 
             // Build notification with CallStyle
             NotificationCompat.Builder builder = new NotificationCompat.Builder(getSafeContext(), NOTIFICATION_CHANNEL_ID)
@@ -1105,13 +1108,16 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
                 .setTimeoutAfter(30000); // Auto-dismiss after 30 seconds
 
             NotificationManagerCompat notificationManager = NotificationManagerCompat.from(getSafeContext());
-            if (ActivityCompat.checkSelfPermission(getSafeContext(), Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            if (
+                ActivityCompat.checkSelfPermission(getSafeContext(), Manifest.permission.POST_NOTIFICATIONS) !=
+                PackageManager.PERMISSION_GRANTED
+            ) {
                 Log.e(TAG, "Cannot get POST_NOTIFICATION perm");
                 return;
             } else {
                 notificationManager.notify(INCOMING_CALL_NOTIFICATION_ID, builder.build());
             }
-            
+
             Log.d(TAG, "Incoming call notification shown");
         } catch (Exception e) {
             Log.e(TAG, "Error showing notification: " + e.getMessage(), e);
@@ -1132,16 +1138,16 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
     // Handle incoming call invites (called from FirebaseMessagingService)
     public void handleCallInvite(CallInvite callInvite) {
         Log.d(TAG, "Received incoming call from: " + callInvite.getFrom());
-        
+
         String callSid = UUID.randomUUID().toString(); // Generate a unique ID
         activeCallInvites.put(callSid, callInvite);
-        
+
         // Create and show notification
         showIncomingCallNotification(callInvite, callSid);
-        
+
         // Start ringtone and vibration
         startRingtone();
-        
+
         JSObject data = new JSObject();
         data.put("callSid", callSid);
         data.put("from", callInvite.getFrom());
@@ -1152,10 +1158,10 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
     // Handle cancelled call invites
     public void handleCancelledCallInvite(CancelledCallInvite cancelledCallInvite) {
         Log.d(TAG, "Call invite cancelled");
-        
+
         // Dismiss notification and stop sounds
         dismissIncomingCallNotification();
-        
+
         // Find and remove the corresponding call invite
         String cancelledCallSid = null;
         for (Map.Entry<String, CallInvite> entry : activeCallInvites.entrySet()) {
@@ -1165,10 +1171,10 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
                 break;
             }
         }
-        
+
         if (cancelledCallSid != null) {
             activeCallInvites.remove(cancelledCallSid);
-            
+
             JSObject data = new JSObject();
             data.put("callSid", cancelledCallSid);
             notifyListeners("callInviteCancelled", data);
@@ -1178,7 +1184,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
     // Methods called by NotificationActionReceiver
     public void acceptCallFromNotification(String callSid) {
         Log.d(TAG, "Accepting call from notification: " + callSid);
-        
+
         CallInvite callInvite = activeCallInvites.get(callSid);
         if (callInvite != null) {
             // Accept call via the foreground service
@@ -1186,7 +1192,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             serviceIntent.setAction(VoiceCallService.ACTION_ACCEPT_CALL);
             serviceIntent.putExtra(VoiceCallService.EXTRA_CALL_INVITE, callInvite);
             serviceIntent.putExtra(VoiceCallService.EXTRA_ACCESS_TOKEN, accessToken);
-            
+
             try {
                 getSafeContext().startForegroundService(serviceIntent);
                 Log.d(TAG, "Call acceptance started via service");
@@ -1198,26 +1204,24 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         }
     }
 
-
-
     public void rejectCallFromNotification(String callSid) {
         Log.d(TAG, "Rejecting call from notification: " + callSid);
-        
+
         CallInvite callInvite = activeCallInvites.get(callSid);
         if (callInvite != null) {
             // Dismiss notification and stop sounds
             dismissIncomingCallNotification();
-            
+
             callInvite.reject(getSafeContext());
             activeCallInvites.remove(callSid);
-            
+
             // Notify JavaScript that the call was rejected from notification
             JSObject data = new JSObject();
             data.put("callSid", callSid);
             data.put("from", callInvite.getFrom());
             data.put("rejectedFromNotification", true);
             notifyListeners("callDisconnected", data);
-            
+
             Log.d(TAG, "Call rejected from notification");
         } else {
             Log.e(TAG, "Call invite not found for SID: " + callSid);

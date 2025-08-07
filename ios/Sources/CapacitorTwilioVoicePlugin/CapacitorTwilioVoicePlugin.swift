@@ -12,21 +12,21 @@ let kCachedAccessToken = "CachedAccessToken"
 let twimlParamTo = "to"
 
 public protocol PushKitEventDelegate: AnyObject {
-    func credentialsUpdated(credentials: PKPushCredentials) -> Void
-    func credentialsInvalidated() -> Void
-    func incomingPushReceived(payload: PKPushPayload) -> Void
-    func incomingPushReceived(payload: PKPushPayload, completion: @escaping () -> Void) -> Void
+    func credentialsUpdated(credentials: PKPushCredentials)
+    func credentialsInvalidated()
+    func incomingPushReceived(payload: PKPushPayload)
+    func incomingPushReceived(payload: PKPushPayload, completion: @escaping () -> Void)
 }
 
 /**
  * Capacitor Twilio Voice Plugin
- * 
+ *
  * Authentication via login() method with JWT access tokens.
  * Automatically validates token expiration and stores tokens persistently.
  */
 @objc(CapacitorTwilioVoicePlugin)
 public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEventDelegate {
-    
+
     public let identifier = "CapacitorTwilioVoicePlugin"
     public let jsName = "CapacitorTwilioVoice"
     public let pluginMethods: [CAPPluginMethod] = [
@@ -66,11 +66,11 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
         }
     }
 
-    public override func load() {
+    override public func load() {
         super.load()
         setupCallKit()
         setupAudioDevice()
-        
+
         // Try to load and validate stored access token
         if let storedToken = UserDefaults.standard.string(forKey: kCachedAccessToken),
            isTokenValid(storedToken) {
@@ -80,7 +80,7 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
             NSLog("No valid access token found. Please call login() first.")
         }
     }
-    
+
     private func setupCallKit() {
         let configuration = CXProviderConfiguration(localizedName: "Voice Call")
         configuration.maximumCallGroups = 2
@@ -90,54 +90,54 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
             provider.setDelegate(self, queue: nil)
         }
     }
-    
+
     private func setupAudioDevice() {
         TwilioVoiceSDK.audioDevice = audioDevice
-        
+
         // Set default audio routing to earpiece (not speaker)
         toggleAudioRoute(toSpeaker: false)
     }
-    
+
     private func isTokenValid(_ token: String) -> Bool {
         guard let payload = decodeJWTPayload(token) else {
             NSLog("Failed to decode JWT payload")
             return false
         }
-        
+
         guard let exp = payload["exp"] as? TimeInterval else {
             NSLog("JWT does not contain exp claim")
             return false
         }
-        
+
         let currentTime = Date().timeIntervalSince1970
         let isValid = exp > currentTime
-        
+
         if !isValid {
             NSLog("JWT token has expired. Exp: \(exp), Current: \(currentTime)")
         }
-        
+
         return isValid
     }
-    
+
     private func decodeJWTPayload(_ token: String) -> [String: Any]? {
         let parts = token.components(separatedBy: ".")
         guard parts.count == 3 else {
             NSLog("Invalid JWT format")
             return nil
         }
-        
+
         var base64 = parts[1]
         // Add padding if needed
         let remainder = base64.count % 4
         if remainder > 0 {
             base64 = base64.padding(toLength: base64.count + 4 - remainder, withPad: "=", startingAt: 0)
         }
-        
+
         guard let data = Data(base64Encoded: base64) else {
             NSLog("Failed to decode base64 JWT payload")
             return nil
         }
-        
+
         do {
             let json = try JSONSerialization.jsonObject(with: data, options: [])
             return json as? [String: Any]
@@ -146,24 +146,24 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
             return nil
         }
     }
-    
+
     private func performRegistration() {
         guard let accessToken = self.accessToken else {
             NSLog("No access token available. Cannot perform registration.")
             return
         }
-        
+
         guard isTokenValid(accessToken) else {
             NSLog("Access token has expired. Cannot perform registration.")
             notifyListeners("registrationFailure", data: ["error": "Access token has expired"])
             return
         }
-        
+
         guard let deviceToken = UserDefaults.standard.data(forKey: kCachedDeviceToken) else {
             NSLog("No device token available. Registration will be performed when push credentials are received.")
             return
         }
-        
+
         TwilioVoiceSDK.register(accessToken: accessToken, deviceToken: deviceToken) { [weak self] error in
             DispatchQueue.main.async {
                 if let error = error {
@@ -179,34 +179,34 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
     }
 
     // MARK: - Plugin Methods
-    
+
     @objc func login(_ call: CAPPluginCall) {
         guard let accessToken = call.getString("accessToken") else {
             call.reject("accessToken is required")
             return
         }
-        
+
         // Validate the JWT token
         guard isTokenValid(accessToken) else {
             call.reject("Invalid or expired access token")
             return
         }
-        
+
         // Store the token persistently
         UserDefaults.standard.set(accessToken, forKey: kCachedAccessToken)
         self.accessToken = accessToken
-        
+
         NSLog("Access token stored and validated successfully")
-        
+
         // Perform registration with the new token
         performRegistration()
-        
+
         call.resolve(["success": true])
     }
-    
+
     @objc func logout(_ call: CAPPluginCall) {
         NSLog("Logging out and clearing stored credentials")
-        
+
         // Unregister from VoIP if we have a device token and access token
         if let accessToken = self.accessToken,
            let deviceToken = UserDefaults.standard.data(forKey: kCachedDeviceToken) {
@@ -218,14 +218,14 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
                 }
             }
         }
-        
+
         // Clear stored credentials
         UserDefaults.standard.removeObject(forKey: kCachedAccessToken)
         UserDefaults.standard.removeObject(forKey: kCachedBindingDate)
-        
+
         // Clear instance variables
         self.accessToken = nil
-        
+
         // End any active calls
         for (_, call) in activeCalls {
             call.disconnect()
@@ -233,18 +233,18 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
         activeCalls.removeAll()
         activeCallInvites.removeAll()
         activeCall = nil
-        
+
         NSLog("Logout completed successfully")
         call.resolve(["success": true])
     }
-    
+
     @objc func isLoggedIn(_ call: CAPPluginCall) {
         var isLoggedIn = false
-        var identity: String? = nil
-        
+        var identity: String?
+
         if let storedToken = UserDefaults.standard.string(forKey: kCachedAccessToken) {
             isLoggedIn = isTokenValid(storedToken)
-            
+
             if isLoggedIn, let payload = decodeJWTPayload(storedToken) {
                 // Extract identity from grants.identity
                 if let grants = payload["grants"] as? [String: Any] {
@@ -252,41 +252,41 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
                 }
             }
         }
-        
+
         var response: [String: Any] = [
             "isLoggedIn": isLoggedIn,
             "hasValidToken": isLoggedIn
         ]
-        
+
         if let identity = identity {
             response["identity"] = identity
         }
-        
+
         call.resolve(response)
     }
-    
+
     @objc func makeCall(_ call: CAPPluginCall) {
         guard let accessToken = self.accessToken else {
             call.reject("No access token available. Please call login() first.")
             return
         }
-        
+
         guard isTokenValid(accessToken) else {
             call.reject("Access token has expired. Please call login() with a new token.")
             return
         }
-        
+
         guard let to = call.getString("to") else {
             call.reject("to parameter is required")
             return
         }
-        
+
         checkRecordPermission { [weak self] permissionGranted in
             guard permissionGranted else {
                 call.reject("Microphone permission not granted")
                 return
             }
-            
+
             let uuid = UUID()
             self?.performStartCallAction(uuid: uuid, handle: to, to: to) { success in
                 if success {
@@ -297,22 +297,22 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
             }
         }
     }
-    
+
     @objc func acceptCall(_ call: CAPPluginCall) {
         guard let callSid = call.getString("callSid") else {
             call.reject("callSid is required")
             return
         }
-        
+
         guard let callInvite = activeCallInvites[callSid] else {
             call.reject("No pending call invite found")
             return
         }
-        
+
         // Create CallKit answer action to properly handle the system UI
         let answerAction = CXAnswerCallAction(call: callInvite.uuid)
         let transaction = CXTransaction(action: answerAction)
-        
+
         callKitCallController.request(transaction) { [weak self] error in
             DispatchQueue.main.async {
                 if let error = error {
@@ -326,22 +326,22 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
             }
         }
     }
-    
+
     @objc func rejectCall(_ call: CAPPluginCall) {
         guard let callSid = call.getString("callSid") else {
             call.reject("callSid is required")
             return
         }
-        
+
         guard let callInvite = activeCallInvites[callSid] else {
             call.reject("No pending call invite found")
             return
         }
-        
+
         // Create CallKit end call action to properly handle the system UI
         let endCallAction = CXEndCallAction(call: callInvite.uuid)
         let transaction = CXTransaction(action: endCallAction)
-        
+
         callKitCallController.request(transaction) { [weak self] error in
             DispatchQueue.main.async {
                 if let error = error {
@@ -355,10 +355,10 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
             }
         }
     }
-    
+
     @objc func endCall(_ call: CAPPluginCall) {
         let callSid = call.getString("callSid")
-        
+
         if let callSid = callSid, let activeCall = activeCalls[callSid] {
             userInitiatedDisconnect = true
             performEndCallAction(uuid: activeCall.uuid!)
@@ -369,53 +369,51 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
             call.reject("No active call found")
             return
         }
-        
+
         call.resolve(["success": true])
     }
-    
+
     @objc func muteCall(_ call: CAPPluginCall) {
         guard let muted = call.getBool("muted") else {
             call.reject("muted parameter is required")
             return
         }
-        
+
         let callSid = call.getString("callSid")
         var targetCall: Call?
-        
+
         if let callSid = callSid {
             targetCall = activeCalls[callSid]
         } else {
             targetCall = getActiveCall()
         }
-        
+
         guard let activeCall = targetCall else {
             call.reject("No active call found")
             return
         }
-        
+
         activeCall.isMuted = muted
         call.resolve(["success": true])
     }
-    
+
     @objc func setSpeaker(_ call: CAPPluginCall) {
         guard let enabled = call.getBool("enabled") else {
             call.reject("enabled parameter is required")
             return
         }
-        
+
         toggleAudioRoute(toSpeaker: enabled)
         call.resolve(["success": true])
     }
-    
 
-    
     @objc func getCallStatus(_ call: CAPPluginCall) {
         let activeCall = getActiveCall()
         let hasActiveCall = activeCall != nil
         let isOnHold = activeCall?.isOnHold ?? false
         let isMuted = activeCall?.isMuted ?? false
         let callSid = activeCall?.uuid?.uuidString
-        
+
         var callState = "idle"
         if let call = activeCall {
             switch call.state {
@@ -433,7 +431,7 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
                 callState = "unknown"
             }
         }
-        
+
         call.resolve([
             "hasActiveCall": hasActiveCall,
             "isOnHold": isOnHold,
@@ -442,13 +440,13 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
             "callState": callState
         ])
     }
-    
+
     @objc func checkMicrophonePermission(_ call: CAPPluginCall) {
         let permissionStatus = AVAudioSession.sharedInstance().recordPermission
         let granted = permissionStatus == .granted
         call.resolve(["granted": granted])
     }
-    
+
     @objc func requestMicrophonePermission(_ call: CAPPluginCall) {
         AVAudioSession.sharedInstance().requestRecordPermission { granted in
             DispatchQueue.main.async {
@@ -458,7 +456,7 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
     }
 
     // MARK: - Helper Methods
-    
+
     private func getActiveCall() -> Call? {
         if let activeCall = activeCall {
             return activeCall
@@ -468,10 +466,10 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
             return nil
         }
     }
-    
+
     private func checkRecordPermission(completion: @escaping (_ permissionGranted: Bool) -> Void) {
         let permissionStatus = AVAudioSession.sharedInstance().recordPermission
-        
+
         switch permissionStatus {
         case .granted:
             completion(true)
@@ -487,7 +485,7 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
             completion(false)
         }
     }
-    
+
     private func toggleAudioRoute(toSpeaker: Bool) {
         audioDevice.block = {
             do {
@@ -502,12 +500,12 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
         }
         audioDevice.block()
     }
-    
+
     private func registrationRequired() -> Bool {
         guard let lastBindingCreated = UserDefaults.standard.object(forKey: kCachedBindingDate) else {
             return true
         }
-        
+
         let date = Date()
         var components = DateComponents()
         components.setValue(kRegistrationTTLInDays/2, for: .day)
@@ -520,20 +518,20 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
     }
 
     // MARK: - PushKitEventDelegate
-    
+
     public func credentialsUpdated(credentials: PKPushCredentials) {
         guard registrationRequired() || UserDefaults.standard.data(forKey: kCachedDeviceToken) != credentials.token else {
             return
         }
-        
+
         UserDefaults.standard.set(credentials.token, forKey: kCachedDeviceToken)
-        
+
         // Only perform registration if we have a valid access token
         guard let accessToken = self.accessToken, isTokenValid(accessToken) else {
             NSLog("No valid access token available. Skipping registration.")
             return
         }
-        
+
         // Perform registration with new credentials
         TwilioVoiceSDK.register(accessToken: accessToken, deviceToken: credentials.token) { [weak self] error in
             DispatchQueue.main.async {
@@ -548,10 +546,10 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
             }
         }
     }
-    
+
     public func credentialsInvalidated() {
         guard let deviceToken = UserDefaults.standard.data(forKey: kCachedDeviceToken) else { return }
-        
+
         // Only attempt unregistration if we have an access token
         if let accessToken = self.accessToken {
             TwilioVoiceSDK.unregister(accessToken: accessToken, deviceToken: deviceToken) { error in
@@ -562,18 +560,18 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
                 }
             }
         }
-        
+
         UserDefaults.standard.removeObject(forKey: kCachedDeviceToken)
         UserDefaults.standard.removeObject(forKey: kCachedBindingDate)
     }
-    
+
     public func incomingPushReceived(payload: PKPushPayload) {
         TwilioVoiceSDK.handleNotification(payload.dictionaryPayload, delegate: self, delegateQueue: nil)
     }
-    
+
     public func incomingPushReceived(payload: PKPushPayload, completion: @escaping () -> Void) {
         TwilioVoiceSDK.handleNotification(payload.dictionaryPayload, delegate: self, delegateQueue: nil)
-        
+
         if let version = Float(UIDevice.current.systemVersion), version < 13.0 {
             incomingPushCompletionCallback = completion
         }
@@ -586,13 +584,13 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
     }
 
     // MARK: - CallKit Actions
-    
+
     private func performStartCallAction(uuid: UUID, handle: String, to: String, completion: @escaping (Bool) -> Void) {
         guard let provider = callKitProvider else {
             completion(false)
             return
         }
-        
+
         let callHandle = CXHandle(type: .generic, value: handle)
         let startCallAction = CXStartCallAction(call: uuid, handle: callHandle)
         let transaction = CXTransaction(action: startCallAction)
@@ -613,7 +611,7 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
             callUpdate.hasVideo = false
 
             provider.reportCall(with: uuid, updated: callUpdate)
-            
+
             self?.performVoiceCall(uuid: uuid, to: to, completionHandler: completion)
         }
     }
@@ -623,7 +621,7 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
 
         let callHandle = CXHandle(type: .generic, value: from)
         let callUpdate = CXCallUpdate()
-        
+
         callUpdate.remoteHandle = callHandle
         callUpdate.supportsDTMF = true
         callUpdate.supportsHolding = true
@@ -648,36 +646,36 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
             }
         }
     }
-    
+
     private func performVoiceCall(uuid: UUID, to: String, completionHandler: @escaping (Bool) -> Void) {
         let connectOptions = ConnectOptions(accessToken: accessToken) { builder in
             builder.params = [twimlParamTo: to]
             builder.uuid = uuid
         }
-        
+
         let call = TwilioVoiceSDK.connect(options: connectOptions, delegate: self)
         activeCall = call
         activeCalls[call.uuid!.uuidString] = call
         callKitCompletionCallback = completionHandler
     }
-    
+
     private func performAnswerVoiceCall(uuid: UUID, completionHandler: @escaping (Bool) -> Void) {
         guard let callInvite = activeCallInvites[uuid.uuidString] else {
             completionHandler(false)
             return
         }
-        
+
         let acceptOptions = AcceptOptions(callInvite: callInvite) { builder in
             builder.uuid = callInvite.uuid
         }
-        
+
         let call = callInvite.accept(options: acceptOptions, delegate: self)
         activeCall = call
         activeCalls[call.uuid!.uuidString] = call
         callKitCompletionCallback = completionHandler
-        
+
         activeCallInvites.removeValue(forKey: uuid.uuidString)
-        
+
         guard #available(iOS 13, *) else {
             incomingPushHandled()
             return
@@ -685,11 +683,11 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
     }
 
     // MARK: - Ringtone
-    
+
     private func playRingback() {
         guard let ringtonePath = Bundle.main.path(forResource: "ringtone", ofType: "wav") else { return }
         let ringtoneURL = URL(fileURLWithPath: ringtonePath)
-        
+
         do {
             ringtonePlayer = try AVAudioPlayer(contentsOf: ringtoneURL)
             ringtonePlayer?.delegate = self
@@ -700,12 +698,12 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
             NSLog("Failed to initialize audio player")
         }
     }
-    
+
     private func stopRingback() {
         guard let ringtonePlayer = ringtonePlayer, ringtonePlayer.isPlaying else { return }
         ringtonePlayer.stop()
     }
-    
+
     private func warningString(_ warning: Call.QualityWarning) -> String {
         switch warning {
         case .highRtt: return "high-rtt"
@@ -723,25 +721,25 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
 extension CapacitorTwilioVoicePlugin: NotificationDelegate {
     public func callInviteReceived(callInvite: CallInvite) {
         UserDefaults.standard.set(Date(), forKey: kCachedBindingDate)
-        
+
         let from = (callInvite.from ?? "Unknown").replacingOccurrences(of: "client:", with: "")
         reportIncomingCall(from: from, uuid: callInvite.uuid)
         activeCallInvites[callInvite.uuid.uuidString] = callInvite
-        
+
         notifyListeners("callInviteReceived", data: [
             "callSid": callInvite.uuid.uuidString,
             "from": from,
             "to": callInvite.to ?? ""
         ])
     }
-    
+
     public func cancelledCallInviteReceived(cancelledCallInvite: CancelledCallInvite, error: Error) {
         guard !activeCallInvites.isEmpty else { return }
-        
-        let callInvite = activeCallInvites.values.first { invite in 
-            invite.callSid == cancelledCallInvite.callSid 
+
+        let callInvite = activeCallInvites.values.first { invite in
+            invite.callSid == cancelledCallInvite.callSid
         }
-        
+
         if let callInvite = callInvite {
             performEndCallAction(uuid: callInvite.uuid)
             activeCallInvites.removeValue(forKey: callInvite.uuid.uuidString)
@@ -754,24 +752,24 @@ extension CapacitorTwilioVoicePlugin: NotificationDelegate {
 extension CapacitorTwilioVoicePlugin: CallDelegate {
     public func callDidStartRinging(call: Call) {
         notifyListeners("callRinging", data: ["callSid": call.uuid!.uuidString])
-        
+
         // Ensure audio is routed to earpiece during ringing (not speaker)
         toggleAudioRoute(toSpeaker: false)
-        
+
         if playCustomRingback {
             playRingback()
         }
     }
-    
+
     public func callDidConnect(call: Call) {
         if playCustomRingback {
             stopRingback()
         }
-        
+
         if let completion = callKitCompletionCallback {
             completion(true)
         }
-        
+
         // Don't force speaker on - maintain current audio routing preference
         // toggleAudioRoute(toSpeaker: true) // Removed - this was forcing speaker on
         notifyListeners("callConnected", data: ["callSid": call.uuid!.uuidString])
@@ -783,30 +781,30 @@ extension CapacitorTwilioVoicePlugin: CallDelegate {
             "error": error.localizedDescription
         ])
     }
-    
+
     public func callDidReconnect(call: Call) {
         notifyListeners("callReconnected", data: ["callSid": call.uuid!.uuidString])
     }
-    
+
     public func callDidFailToConnect(call: Call, error: Error) {
         if let completion = callKitCompletionCallback {
             completion(false)
         }
-        
+
         if let provider = callKitProvider {
             provider.reportCall(with: call.uuid!, endedAt: Date(), reason: CXCallEndedReason.failed)
         }
 
         callDisconnected(call: call, error: error)
     }
-    
+
     public func callDidDisconnect(call: Call, error: Error?) {
         if !userInitiatedDisconnect {
             var reason = CXCallEndedReason.remoteEnded
             if error != nil {
                 reason = .failed
             }
-            
+
             if let provider = callKitProvider {
                 provider.reportCall(with: call.uuid!, endedAt: Date(), reason: reason)
             }
@@ -814,29 +812,29 @@ extension CapacitorTwilioVoicePlugin: CallDelegate {
 
         callDisconnected(call: call, error: error)
     }
-    
+
     private func callDisconnected(call: Call, error: Error? = nil) {
         if call == activeCall {
             activeCall = nil
         }
-        
+
         activeCalls.removeValue(forKey: call.uuid!.uuidString)
         userInitiatedDisconnect = false
-        
+
         if playCustomRingback {
             stopRingback()
         }
-        
+
         notifyListeners("callDisconnected", data: [
             "callSid": call.uuid!.uuidString,
             "error": error?.localizedDescription as Any
         ])
     }
-    
+
     public func callDidReceiveQualityWarnings(call: Call, currentWarnings: Set<NSNumber>, previousWarnings: Set<NSNumber>) {
         let currentWarningStrings = currentWarnings.map { warningString(Call.QualityWarning(rawValue: $0.uintValue)!) }
         let previousWarningStrings = previousWarnings.map { warningString(Call.QualityWarning(rawValue: $0.uintValue)!) }
-        
+
         notifyListeners("callQualityWarningsChanged", data: [
             "callSid": call.uuid!.uuidString,
             "currentWarnings": currentWarningStrings,
@@ -866,7 +864,7 @@ extension CapacitorTwilioVoicePlugin: CXProviderDelegate {
     }
 
     public func provider(_ provider: CXProvider, perform action: CXAnswerCallAction) {
-        performAnswerVoiceCall(uuid: action.callUUID) { success in
+        performAnswerVoiceCall(uuid: action.callUUID) { _ in
             // Call completion is handled in the delegate methods
         }
         action.fulfill()
@@ -881,7 +879,7 @@ extension CapacitorTwilioVoicePlugin: CXProviderDelegate {
         }
         action.fulfill()
     }
-    
+
     public func provider(_ provider: CXProvider, perform action: CXSetHeldCallAction) {
         if let call = activeCalls[action.callUUID.uuidString] {
             call.isOnHold = action.isOnHold
@@ -894,7 +892,7 @@ extension CapacitorTwilioVoicePlugin: CXProviderDelegate {
             action.fail()
         }
     }
-    
+
     public func provider(_ provider: CXProvider, perform action: CXSetMutedCallAction) {
         if let call = activeCalls[action.callUUID.uuidString] {
             call.isMuted = action.isMuted
@@ -903,7 +901,7 @@ extension CapacitorTwilioVoicePlugin: CXProviderDelegate {
             action.fail()
         }
     }
-    
+
     public func provider(_ provider: CXProvider, timedOutPerforming action: CXAction) {
         NSLog("Provider timed out performing action: \(action)")
     }
@@ -915,7 +913,7 @@ extension CapacitorTwilioVoicePlugin: AVAudioPlayerDelegate {
     public func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
         NSLog("Audio player finished playing successfully: \(flag)")
     }
-    
+
     public func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
         if let error = error {
             NSLog("Audio player decode error: \(error.localizedDescription)")
