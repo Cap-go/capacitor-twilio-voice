@@ -28,7 +28,7 @@
     "capacitor",
     "plugin",
     "native",
-        "twilio",
+    "twilio",
     "voice",
     "call",
     "callkit",
