@@ -27,7 +27,13 @@
   "keywords": [
     "capacitor",
     "plugin",
-    "native"
+    "native",
+        "twilio",
+    "voice",
+    "call",
+    "callkit",
+    "ios",
+    "android"
   ],
   "scripts": {
     "verify": "npm run verify:ios && npm run verify:android && npm run verify:web",
