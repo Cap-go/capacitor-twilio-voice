@@ -97,6 +97,10 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
     private MediaPlayer ringtonePlayer;
     private Vibrator vibrator;
 
+    // Permission handling
+    private static final int REQUEST_CODE_RECORD_AUDIO_FOR_ACCEPT = 2001;
+    private String pendingCallSidForPermission;
+
     // Voice Call Service
     private VoiceCallService voiceCallService;
     private boolean isServiceBound = false;
@@ -266,12 +270,12 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
 
                             // Delay the auto-accept slightly to ensure plugin is fully loaded
                             new android.os.Handler().postDelayed(
-                                    () -> {
-                                        Log.d(TAG, "Auto-accepting call: " + callSid);
-                                        acceptCallFromNotification(callSid);
-                                    },
-                                    500
-                                );
+                                () -> {
+                                    Log.d(TAG, "Auto-accepting call: " + callSid);
+                                    ensureMicPermissionThenAccept(callSid);
+                                },
+                                500
+                            );
                         }
                     }
                 }
@@ -379,6 +383,52 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
 
     private void initializeSoundAndVibration() {
         vibrator = (Vibrator) getSafeContext().getSystemService(Context.VIBRATOR_SERVICE);
+    }
+
+    private void ensureMicPermissionThenAccept(String callSid) {
+        Context context = getSafeContext();
+        boolean granted = ActivityCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
+        if (granted) {
+            proceedAcceptCall(callSid);
+            return;
+        }
+
+        // Remember callSid and request via Activity runtime permission API
+        pendingCallSidForPermission = callSid;
+        Activity activity = getActivity();
+        if (activity != null) {
+            ActivityCompat.requestPermissions(activity, new String[]{Manifest.permission.RECORD_AUDIO}, REQUEST_CODE_RECORD_AUDIO_FOR_ACCEPT);
+        } else if (mainActivityClass != null) {
+            // No current activity; bring app to foreground where permission can be requested
+            Intent launchIntent = new Intent(context, mainActivityClass);
+            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            launchIntent.putExtra("AUTO_ACCEPT_CALL", true);
+            launchIntent.putExtra(EXTRA_CALL_SID, callSid);
+            context.startActivity(launchIntent);
+        } else {
+            Log.w(TAG, "No activity available to request RECORD_AUDIO permission");
+        }
+    }
+
+    // Helper to actually start the service once permission is granted
+    private void proceedAcceptCall(String callSid) {
+        CallInvite callInvite = activeCallInvites.get(callSid);
+        if (callInvite == null) {
+            Log.e(TAG, "No pending call invite for: " + callSid);
+            return;
+        }
+
+        Intent serviceIntent = new Intent(getSafeContext(), VoiceCallService.class);
+        serviceIntent.setAction(VoiceCallService.ACTION_ACCEPT_CALL);
+        serviceIntent.putExtra(VoiceCallService.EXTRA_CALL_INVITE, callInvite);
+        serviceIntent.putExtra(VoiceCallService.EXTRA_ACCESS_TOKEN, accessToken);
+
+        try {
+            getSafeContext().startForegroundService(serviceIntent);
+            Log.d(TAG, "Call acceptance started via service (permission granted)");
+        } catch (Exception e) {
+            Log.e(TAG, "Error accepting call via service", e);
+        }
     }
 
     private Context getSafeContext() {
@@ -666,22 +716,12 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             return;
         }
 
-        // Accept call via the foreground service
-        Intent serviceIntent = new Intent(getSafeContext(), VoiceCallService.class);
-        serviceIntent.setAction(VoiceCallService.ACTION_ACCEPT_CALL);
-        serviceIntent.putExtra(VoiceCallService.EXTRA_CALL_INVITE, callInvite);
-        serviceIntent.putExtra(VoiceCallService.EXTRA_ACCESS_TOKEN, accessToken);
+        // Ensure microphone permission before starting the service
+        ensureMicPermissionThenAccept(callSid);
 
-        try {
-            getSafeContext().startForegroundService(serviceIntent);
-
-            JSObject ret = new JSObject();
-            ret.put("success", true);
-            call.resolve(ret);
-        } catch (Exception e) {
-            Log.e(TAG, "Error accepting call via service", e);
-            call.reject("Failed to accept call: " + e.getMessage());
-        }
+        JSObject ret = new JSObject();
+        ret.put("success", true);
+        call.resolve(ret);
     }
 
     @PluginMethod
@@ -801,6 +841,24 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
     @PluginMethod
     public void requestMicrophonePermission(PluginCall call) {
         requestPermissions(call);
+    }
+
+    @Override
+    protected void handleRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.handleRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        // If we were waiting to accept a call after mic permission
+        if (pendingCallSidForPermission != null) {
+            boolean granted = ActivityCompat.checkSelfPermission(getSafeContext(), Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
+            String callSid = pendingCallSidForPermission;
+            pendingCallSidForPermission = null;
+            if (granted) {
+                Log.d(TAG, "RECORD_AUDIO granted from permission flow; proceeding to accept call");
+                proceedAcceptCall(callSid);
+            } else {
+                Log.w(TAG, "RECORD_AUDIO denied; cannot accept call");
+            }
+        }
     }
 
     // Twilio Voice Listeners
@@ -1187,18 +1245,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
 
         CallInvite callInvite = activeCallInvites.get(callSid);
         if (callInvite != null) {
-            // Accept call via the foreground service
-            Intent serviceIntent = new Intent(getSafeContext(), VoiceCallService.class);
-            serviceIntent.setAction(VoiceCallService.ACTION_ACCEPT_CALL);
-            serviceIntent.putExtra(VoiceCallService.EXTRA_CALL_INVITE, callInvite);
-            serviceIntent.putExtra(VoiceCallService.EXTRA_ACCESS_TOKEN, accessToken);
-
-            try {
-                getSafeContext().startForegroundService(serviceIntent);
-                Log.d(TAG, "Call acceptance started via service");
-            } catch (Exception e) {
-                Log.e(TAG, "Error accepting call via service", e);
-            }
+            ensureMicPermissionThenAccept(callSid);
         } else {
             Log.e(TAG, "Call invite not found for SID: " + callSid);
         }

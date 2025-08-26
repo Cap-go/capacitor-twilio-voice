@@ -7,3 +7,6 @@ project(':capacitor-local-notifications').projectDir = new File('../node_modules
 
 include ':capgo-capacitor-twilio-voice'
 project(':capgo-capacitor-twilio-voice').projectDir = new File('../../android')
+
+include ':capgo-native-audio'
+project(':capgo-native-audio').projectDir = new File('../node_modules/@capgo/native-audio/android')

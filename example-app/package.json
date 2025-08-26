@@ -19,6 +19,7 @@
     "@capacitor/ios": "7.0.0",
     "@capacitor/local-notifications": "^7.0.1",
     "@capgo/capacitor-twilio-voice": "file:..",
+    "@capgo/native-audio": "^7.3.36",
     "patch-package": "^8.0.0"
   },
   "devDependencies": {

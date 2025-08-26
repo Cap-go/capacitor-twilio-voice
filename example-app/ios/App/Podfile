@@ -13,6 +13,7 @@ def capacitor_pods
   pod 'CapacitorCordova', :path => '../../node_modules/@capacitor/ios'
   pod 'CapacitorLocalNotifications', :path => '../../node_modules/@capacitor/local-notifications'
   pod 'CapgoCapacitorTwilioVoice', :path => '../../..'
+  pod 'CapgoNativeAudio', :path => '../../node_modules/@capgo/native-audio'
 end
 
 target 'App' do
