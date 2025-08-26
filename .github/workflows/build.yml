@@ -43,6 +43,9 @@ jobs:
       - name: Install dependencies
         id: install_code
         run: bun i
+      - name: Select Xcode version
+      # added because Github broke their images https://github.com/actions/runner-images/issues/12758
+        run: sudo xcode-select --switch /Applications/Xcode_16.4.app
       - name: Build
         id: build_code
         run: bun run verify:ios
