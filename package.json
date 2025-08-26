@@ -1,6 +1,6 @@
 {
   "name": "@capgo/capacitor-twilio-voice",
-  "version": "7.1.0",
+  "version": "7.1.2",
   "description": "Integrates the Twilio Voice SDK into Capacitor",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",
@@ -27,7 +27,13 @@
   "keywords": [
     "capacitor",
     "plugin",
-    "native"
+    "native",
+    "twilio",
+    "voice",
+    "call",
+    "callkit",
+    "ios",
+    "android"
   ],
   "scripts": {
     "verify": "npm run verify:ios && npm run verify:android && npm run verify:web",
