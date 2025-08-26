@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.2.0](https://github.com/Cap-go/capacitor-twilio-voice/compare/7.1.2...7.2.0) (2025-08-26)
+
+
+### Features
+
+* bug fixes && remove patch and use a custom script instead ([47c6d3a](https://github.com/Cap-go/capacitor-twilio-voice/commit/47c6d3a32816376965826b1da3880c4e5466a620))
+
 ## [7.1.2](https://github.com/Cap-go/capacitor-twilio-voice/compare/7.1.1...7.1.2) (2025-08-19)
 
 ### [7.1.1](https://github.com/Cap-go/capacitor-twilio-voice/compare/7.1.0...7.1.1) (2025-08-07)
