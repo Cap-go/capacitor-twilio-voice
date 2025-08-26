@@ -270,12 +270,12 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
 
                             // Delay the auto-accept slightly to ensure plugin is fully loaded
                             new android.os.Handler().postDelayed(
-                                () -> {
-                                    Log.d(TAG, "Auto-accepting call: " + callSid);
-                                    ensureMicPermissionThenAccept(callSid);
-                                },
-                                500
-                            );
+                                    () -> {
+                                        Log.d(TAG, "Auto-accepting call: " + callSid);
+                                        ensureMicPermissionThenAccept(callSid);
+                                    },
+                                    500
+                                );
                         }
                     }
                 }
@@ -387,7 +387,8 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
 
     private void ensureMicPermissionThenAccept(String callSid) {
         Context context = getSafeContext();
-        boolean granted = ActivityCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
+        boolean granted =
+            ActivityCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
         if (granted) {
             proceedAcceptCall(callSid);
             return;
@@ -397,7 +398,11 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         pendingCallSidForPermission = callSid;
         Activity activity = getActivity();
         if (activity != null) {
-            ActivityCompat.requestPermissions(activity, new String[]{Manifest.permission.RECORD_AUDIO}, REQUEST_CODE_RECORD_AUDIO_FOR_ACCEPT);
+            ActivityCompat.requestPermissions(
+                activity,
+                new String[] { Manifest.permission.RECORD_AUDIO },
+                REQUEST_CODE_RECORD_AUDIO_FOR_ACCEPT
+            );
         } else if (mainActivityClass != null) {
             // No current activity; bring app to foreground where permission can be requested
             Intent launchIntent = new Intent(context, mainActivityClass);
@@ -849,7 +854,8 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
 
         // If we were waiting to accept a call after mic permission
         if (pendingCallSidForPermission != null) {
-            boolean granted = ActivityCompat.checkSelfPermission(getSafeContext(), Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
+            boolean granted =
+                ActivityCompat.checkSelfPermission(getSafeContext(), Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
             String callSid = pendingCallSidForPermission;
             pendingCallSidForPermission = null;
             if (granted) {
