@@ -12,7 +12,11 @@ class TwilioVoiceApp {
     this.isLoggedIn = false;
     this.currentIdentity = null;
     this.pendingCallInvite = null;
-    
+   
+    // We need to register the plugin here because it's not registered automatically on Android
+    if (Capacitor.getPlatform() === 'android') {
+      Capacitor.registerPlugin("CapacitorTwilioVoice");
+    }
     this.initializeElements();
     this.setupEventListeners();
     this.setupPluginListeners();
