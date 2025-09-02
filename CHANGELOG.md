@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.2.5](https://github.com/Cap-go/capacitor-twilio-voice/compare/7.2.4...7.2.5) (2025-09-02)
+
+
+### Bug Fixes
+
+* priority of FCM on android ([98c3328](https://github.com/Cap-go/capacitor-twilio-voice/commit/98c33284d84cb32f58197efa0ac1d24462e38efe))
+
 ## [7.2.4](https://github.com/Cap-go/capacitor-twilio-voice/compare/7.2.3...7.2.4) (2025-08-26)
 
 ## [7.2.3](https://github.com/Cap-go/capacitor-twilio-voice/compare/7.2.2...7.2.3) (2025-08-26)
