@@ -30,16 +30,25 @@ public class VoiceFirebaseMessagingService extends FirebaseMessagingService impl
 
     @Override
     public void onMessageReceived(@NonNull RemoteMessage remoteMessage) {
-        super.onMessageReceived(remoteMessage);
         Log.d(
             TAG,
-            String.format("Received Firebase message\n\tmessage data: %s\n\tfrom: %s", remoteMessage.getData(), remoteMessage.getFrom())
+            String.format("HIGHEST PRIORITY: Received Firebase message\n\tmessage data: %s\n\tfrom: %s", remoteMessage.getData(), remoteMessage.getFrom())
         );
 
         // Check if message contains a data payload and handle with Twilio Voice SDK
-        if (!remoteMessage.getData().isEmpty() && !Voice.handleMessage(this, remoteMessage.getData(), this)) {
-            Log.w(TAG, String.format("Received message was not a valid Twilio Voice SDK payload: %s", remoteMessage.getData()));
+        if (!remoteMessage.getData().isEmpty()) {
+            boolean isHandled = Voice.handleMessage(this, remoteMessage.getData(), this);
+            if (isHandled) {
+                Log.d(TAG, "Successfully handled Twilio Voice message - NOT calling super() to prevent other FCM services from processing");
+                // DO NOT call super.onMessageReceived() for Twilio messages to prevent other services from handling them
+                return;
+            } else {
+                Log.w(TAG, String.format("Received message was not a valid Twilio Voice SDK payload: %s", remoteMessage.getData()));
+            }
         }
+        
+        // Only call super for non-Twilio messages
+        super.onMessageReceived(remoteMessage);
     }
 
     // MessageListener implementation

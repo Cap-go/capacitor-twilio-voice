@@ -13,11 +13,12 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
 
     <application>
-        <!-- Firebase Messaging Service for Twilio Voice -->
+        <!-- Firebase Messaging Service for Twilio Voice - HIGHEST PRIORITY -->
         <service
             android:name="ee.forgr.capacitor_twilio_voice.VoiceFirebaseMessagingService"
-            android:exported="false">
-            <intent-filter>
+            android:exported="false"
+            android:stopWithTask="false">
+            <intent-filter android:priority="1000">
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
