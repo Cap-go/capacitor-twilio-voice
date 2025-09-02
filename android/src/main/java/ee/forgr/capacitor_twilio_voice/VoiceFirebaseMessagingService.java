@@ -32,7 +32,11 @@ public class VoiceFirebaseMessagingService extends FirebaseMessagingService impl
     public void onMessageReceived(@NonNull RemoteMessage remoteMessage) {
         Log.d(
             TAG,
-            String.format("HIGHEST PRIORITY: Received Firebase message\n\tmessage data: %s\n\tfrom: %s", remoteMessage.getData(), remoteMessage.getFrom())
+            String.format(
+                "HIGHEST PRIORITY: Received Firebase message\n\tmessage data: %s\n\tfrom: %s",
+                remoteMessage.getData(),
+                remoteMessage.getFrom()
+            )
         );
 
         // Check if message contains a data payload and handle with Twilio Voice SDK
@@ -46,7 +50,7 @@ public class VoiceFirebaseMessagingService extends FirebaseMessagingService impl
                 Log.w(TAG, String.format("Received message was not a valid Twilio Voice SDK payload: %s", remoteMessage.getData()));
             }
         }
-        
+
         // Only call super for non-Twilio messages
         super.onMessageReceived(remoteMessage);
     }
