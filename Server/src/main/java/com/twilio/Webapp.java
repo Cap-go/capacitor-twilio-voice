@@ -7,10 +7,9 @@ import com.twilio.jwt.accesstoken.VoiceGrant;
 import com.twilio.rest.api.v2010.account.Call;
 import com.twilio.twiml.TwiMLException;
 import com.twilio.twiml.VoiceResponse;
+import com.twilio.twiml.voice.*;
 import com.twilio.twiml.voice.Client;
-import com.twilio.twiml.voice.Dial;
 import com.twilio.twiml.voice.Number;
-import com.twilio.twiml.voice.Say;
 import com.twilio.type.*;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
@@ -280,6 +279,14 @@ public class Webapp {
     private static String call(final String to, final String from) {
         VoiceResponse voiceResponse;
         String toXml = null;
+
+        Parameter parameter = new Parameter.Builder().name("FirstName")
+                .value("Jane").build();
+
+        Parameter parameter2 = new Parameter.Builder().name("CapacitorTwilioCallerName")
+                .value("Magic Doe").build();
+
+
         if (to == null || to.isEmpty()) {
             Say say = new Say.Builder("Congratulations! You have made your first call! Good bye.").build();
             voiceResponse = new VoiceResponse.Builder().say(say).build();
@@ -288,7 +295,7 @@ public class Webapp {
             Dial dial = new Dial.Builder().callerId(CALLER_NUMBER).number(number).build();
             voiceResponse = new VoiceResponse.Builder().dial(dial).build();
         } else {
-            Client client = new Client.Builder(to).build();
+            Client client = new Client.Builder(to).parameter(parameter).parameter(parameter2).build();
             Dial dial = new Dial.Builder().callerId(from).timeout(30).client(client).build();
             voiceResponse = new VoiceResponse.Builder().dial(dial).build();
         }

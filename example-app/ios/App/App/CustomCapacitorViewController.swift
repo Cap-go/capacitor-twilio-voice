@@ -13,6 +13,7 @@ import CapgoCapacitorTwilioVoice
 class CustomCapacitorViewController: CAPBridgeViewController {
     
     var passPushKitEventDelegate: ((PushKitEventDelegate?) -> Void)? = nil
+    var passVoicePlugin: ((CapacitorTwilioVoicePlugin?) -> Void)? = nil
     
     override func capacitorDidLoad() {
         if let passPushKitEventDelegate = passPushKitEventDelegate {
@@ -25,6 +26,7 @@ class CustomCapacitorViewController: CAPBridgeViewController {
             }
             
             passPushKitEventDelegate(twilioPlugin)
+            passVoicePlugin?(twilioPlugin)
         }
     }
 }

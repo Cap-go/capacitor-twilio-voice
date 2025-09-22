@@ -1,6 +1,7 @@
 import UIKit
 import Capacitor
 import PushKit
+import Intents
 import CapgoCapacitorTwilioVoice
 
 @UIApplicationMain
@@ -8,6 +9,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, PKPushRegistryDelegate {
     var window: UIWindow?
     var pushKitEventDelegate: PushKitEventDelegate?
     var voipRegistry = PKPushRegistry.init(queue: DispatchQueue.main)
+    var voicePlugin: CapacitorTwilioVoicePlugin?
+    @available(iOS 10.0, *) var pendingStartCallIntent: INIntent?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
@@ -29,9 +32,18 @@ class AppDelegate: UIResponder, UIApplicationDelegate, PKPushRegistryDelegate {
         viewController.passPushKitEventDelegate = { delegate in
             self.pushKitEventDelegate = delegate
         }
-        
+
+        viewController.passVoicePlugin = { plugin in
+            self.voicePlugin = plugin
+
+            if #available(iOS 10.0, *), let pendingIntent = self.pendingStartCallIntent {
+                self.pendingStartCallIntent = nil
+                self.processStartCallIntent(pendingIntent)
+            }
+        }
+
         // self.pushKitEventDelegate = viewController
-        
+
         return true
     }
     
@@ -62,6 +74,17 @@ class AppDelegate: UIResponder, UIApplicationDelegate, PKPushRegistryDelegate {
         // Called when the application is about to terminate. Save data if appropriate. See also applicationDidEnterBackground:.
     }
 
+    @available(iOS 10.0, *)
+    private func processStartCallIntent(_ intent: INIntent) -> Bool {
+        if let plugin = voicePlugin {
+            plugin.handleStartCallIntent(intent: intent)
+        } else {
+            pendingStartCallIntent = intent
+        }
+
+        return true
+    }
+
     func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
         // Called when the app was launched with a url. Feel free to add additional processing here,
         // but if you want the App API to support tracking app url opens, make sure to keep this call
@@ -69,10 +92,28 @@ class AppDelegate: UIResponder, UIApplicationDelegate, PKPushRegistryDelegate {
     }
 
     func application(_ application: UIApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void) -> Bool {
+        var handledIntent = false
+
+        if #available(iOS 10.0, *), let incomingIntent = userActivity.interaction?.intent,
+           isSupportedCallIntent(incomingIntent) {
+            handledIntent = processStartCallIntent(incomingIntent)
+        }
+
         // Called when the app was launched with an activity, including Universal Links.
         // Feel free to add additional processing here, but if you want the App API to support
         // tracking app url opens, make sure to keep this call
-        return ApplicationDelegateProxy.shared.application(application, continue: userActivity, restorationHandler: restorationHandler)
+        let capacitorHandled = ApplicationDelegateProxy.shared.application(application, continue: userActivity, restorationHandler: restorationHandler)
+
+        return handledIntent || capacitorHandled
+    }
+
+    @available(iOS 10.0, *)
+    private func isSupportedCallIntent(_ intent: INIntent) -> Bool {
+        if #available(iOS 13.0, *), intent is INStartCallIntent {
+            return true
+        }
+
+        return intent is INStartAudioCallIntent
     }
     
     // MARK: PKPushRegistryDelegate

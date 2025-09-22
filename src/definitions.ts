@@ -30,12 +30,27 @@ export interface CapacitorTwilioVoicePlugin {
   // Listeners for events
   addListener(
     eventName: 'callInviteReceived',
-    listenerFunc: (data: { callSid: string; from: string; to: string }) => void,
+    listenerFunc: (data: { callSid: string; from: string; to: string, customParams: Record<string, string>}) => void,
   ): Promise<PluginListenerHandle>;
 
   addListener(
     eventName: 'callConnected',
     listenerFunc: (data: { callSid: string }) => void,
+  ): Promise<PluginListenerHandle>;
+
+  addListener(
+    eventName: 'callInviteCancelled',
+    listenerFunc: (data: { callSid: string; reason: 'user_declined' | 'remote_cancelled' }) => void,
+  ): Promise<PluginListenerHandle>;
+
+  addListener(
+    eventName: 'outgoingCallInitiated',
+    listenerFunc: (data: { callSid: string; to: string; source: 'app' | 'system'; displayName?: string }) => void,
+  ): Promise<PluginListenerHandle>;
+
+  addListener(
+    eventName: 'outgoingCallFailed',
+    listenerFunc: (data: { callSid: string; to: string; reason: 'missing_access_token' | 'connection_failed' | 'no_call_details' | 'microphone_permission_denied' | 'invalid_contact' | 'callkit_request_failed' | 'unsupported_intent'; displayName?: string }) => void,
   ): Promise<PluginListenerHandle>;
 
   addListener(
