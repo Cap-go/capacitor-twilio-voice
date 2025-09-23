@@ -1202,7 +1202,9 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         activeCallInvites.put(callSid, callInvite);
 
         Map<String, String> params = callInvite.getCustomParameters();
-        String callerName = params.containsKey("CapacitorTwilioCallerName") ? params.get("CapacitorTwilioCallerName") : callInvite.getFrom();
+        String callerName = params.containsKey("CapacitorTwilioCallerName")
+            ? params.get("CapacitorTwilioCallerName")
+            : callInvite.getFrom();
 
         // Create and show notification
         showIncomingCallNotification(callInvite, callSid, callerName);
