@@ -280,12 +280,9 @@ public class Webapp {
         VoiceResponse voiceResponse;
         String toXml = null;
 
-        Parameter parameter = new Parameter.Builder().name("FirstName")
-                .value("Jane").build();
+        Parameter parameter = new Parameter.Builder().name("FirstName").value("Jane").build();
 
-        Parameter parameter2 = new Parameter.Builder().name("CapacitorTwilioCallerName")
-                .value("Magic Doe").build();
-
+        Parameter parameter2 = new Parameter.Builder().name("CapacitorTwilioCallerName").value("Magic Doe").build();
 
         if (to == null || to.isEmpty()) {
             Say say = new Say.Builder("Congratulations! You have made your first call! Good bye.").build();
