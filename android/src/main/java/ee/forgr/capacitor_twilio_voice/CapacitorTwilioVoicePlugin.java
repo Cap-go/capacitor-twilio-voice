@@ -1083,13 +1083,8 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         }
     };*/
 
-    private void showIncomingCallNotification(CallInvite callInvite, String callSid) {
+    private void showIncomingCallNotification(CallInvite callInvite, String callSid, String callerName) {
         try {
-            String callerName = callInvite.getFrom();
-            if (callerName != null && callerName.startsWith("client:")) {
-                callerName = callerName.substring(7); // Remove "client:" prefix
-            }
-
             // Create intent for accepting the call
             PendingIntent acceptPendingIntent;
             if (this.bridge == null) {
@@ -1206,16 +1201,20 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         String callSid = UUID.randomUUID().toString(); // Generate a unique ID
         activeCallInvites.put(callSid, callInvite);
 
+        Map<String, String> params = callInvite.getCustomParameters();
+        String callerName = params.containsKey("CapacitorTwilioCallerName") ? params.get("CapacitorTwilioCallerName") : callInvite.getFrom();
+
         // Create and show notification
-        showIncomingCallNotification(callInvite, callSid);
+        showIncomingCallNotification(callInvite, callSid, callerName);
 
         // Start ringtone and vibration
         startRingtone();
 
         JSObject data = new JSObject();
         data.put("callSid", callSid);
-        data.put("from", callInvite.getFrom());
+        data.put("from", callerName);
         data.put("to", callInvite.getTo());
+        data.put("customParams", new JSONObject(params));
         notifyListeners("callInviteReceived", data);
     }
 
