@@ -4,6 +4,7 @@ import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.KeyguardManager;
+import android.app.KeyguardManager;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -21,11 +22,14 @@ import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.IBinder;
-import android.os.Vibrator;
 import android.os.VibrationEffect;
+import android.os.Vibrator;
+import android.provider.Settings;
 import android.util.Base64;
 import android.util.Log;
 import android.widget.Toast;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.app.ActivityCompat;
@@ -39,8 +43,6 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
-import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.contract.ActivityResultContracts;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.messaging.FirebaseMessaging;
@@ -62,8 +64,6 @@ import java.util.Set;
 import java.util.UUID;
 import org.json.JSONException;
 import org.json.JSONObject;
-import android.provider.Settings;
-import android.app.KeyguardManager;
 
 @CapacitorPlugin(
     name = "CapacitorTwilioVoice",
@@ -265,9 +265,10 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
 
         Log.d(TAG, "CapacitorTwilioVoice plugin loaded");
 
-        micPermissionLauncher =
-            getBridge()
-                .registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), permissions -> handleMicPermissionResult(permissions));
+        micPermissionLauncher = getBridge().registerForActivityResult(
+            new ActivityResultContracts.RequestMultiplePermissions(),
+            (permissions) -> handleMicPermissionResult(permissions)
+        );
     }
 
     private void bindToVoiceCallService() {
@@ -1050,23 +1051,26 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             return;
         }
 
-        km.requestDismissKeyguard(activity, new KeyguardManager.KeyguardDismissCallback() {
-            @Override
-            public void onDismissSucceeded() {
-                Log.d(TAG, "Keyguard dismissed, opening settings");
-                openAppSettings();
-            }
+        km.requestDismissKeyguard(
+            activity,
+            new KeyguardManager.KeyguardDismissCallback() {
+                @Override
+                public void onDismissSucceeded() {
+                    Log.d(TAG, "Keyguard dismissed, opening settings");
+                    openAppSettings();
+                }
 
-            @Override
-            public void onDismissCancelled() {
-                Log.d(TAG, "Keyguard dismissal cancelled");
-            }
+                @Override
+                public void onDismissCancelled() {
+                    Log.d(TAG, "Keyguard dismissal cancelled");
+                }
 
-            @Override
-            public void onDismissError() {
-                Log.w(TAG, "Keyguard dismissal error");
+                @Override
+                public void onDismissError() {
+                    Log.w(TAG, "Keyguard dismissal error");
+                }
             }
-        });
+        );
     }
 
     private void moveAppToBackgroundIfLocked() {
