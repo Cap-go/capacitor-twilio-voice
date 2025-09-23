@@ -2,6 +2,7 @@ package ee.forgr.capacitor_twilio_voice;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -23,11 +24,13 @@ import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.util.Base64;
 import android.util.Log;
+import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
+import androidx.core.content.ContextCompat;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -56,6 +59,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.json.JSONException;
 import org.json.JSONObject;
+import android.provider.Settings;
 
 @CapacitorPlugin(
     name = "CapacitorTwilioVoice",
@@ -70,6 +74,8 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
     private static final String TAG = "CapacitorTwilioVoice";
     private static final String PREF_ACCESS_TOKEN = "twilio_access_token";
     private static final String PREF_FCM_TOKEN = "twilio_fcm_token";
+    private static final String PREFS_NAME = "capacitor_twilio_voice_prefs";
+    private static final String PREF_MIC_PERMISSION_REQUESTED = "mic_permission_requested";
 
     public static CapacitorTwilioVoicePlugin instance;
 
@@ -100,6 +106,20 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
     // Permission handling
     private static final int REQUEST_CODE_RECORD_AUDIO_FOR_ACCEPT = 2001;
     private String pendingCallSidForPermission;
+
+    private enum PendingPermissionAction {
+        NONE,
+        OUTGOING_CALL,
+        ACCEPT_CALL
+    }
+
+    private PendingPermissionAction pendingPermissionAction = PendingPermissionAction.NONE;
+    private PluginCall pendingOutgoingCall;
+    private String pendingOutgoingTo;
+    private PluginCall pendingPermissionCall;
+    private long permissionRequestTimestamp = 0L;
+    private int permissionAttemptCount = 0;
+    private boolean awaitingSettingsResult = false;
 
     // Voice Call Service
     private VoiceCallService voiceCallService;
@@ -354,6 +374,30 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         Log.d(TAG, "CapacitorTwilioVoice plugin destroyed");
     }
 
+    @Override
+    protected void handleOnResume() {
+        super.handleOnResume();
+        Log.d(TAG, "handleOnResume: hasPermission=" + hasMicrophonePermission() + ", awaitingSettings=" + awaitingSettingsResult + ", pendingCall=" + (pendingPermissionCall != null) + ", pendingAction=" + pendingPermissionAction);
+        if (hasMicrophonePermission()) {
+            if (pendingPermissionAction != PendingPermissionAction.NONE || pendingPermissionCall != null) {
+                awaitingSettingsResult = false;
+                Log.d(TAG, "handleOnResume: permission granted, resuming pending flow");
+                handleMicrophonePermissionGranted();
+            }
+        } else if (awaitingSettingsResult && pendingPermissionCall != null) {
+            awaitingSettingsResult = false;
+            Log.d(TAG, "handleOnResume: permission still denied after returning from settings");
+            JSObject ret = new JSObject();
+            ret.put("granted", false);
+            pendingPermissionCall.setKeepAlive(false);
+            pendingPermissionCall.resolve(ret);
+            pendingPermissionCall = null;
+        } else if (pendingPermissionCall != null) {
+            Log.d(TAG, "handleOnResume: permission denied from dialog, invoking fallback handling");
+            handleMicrophonePermissionDenied();
+        }
+    }
+
     public void setInjectedContext(Context injectedContext) {
         this.injectedContext = injectedContext;
     }
@@ -386,33 +430,18 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
     }
 
     private void ensureMicPermissionThenAccept(String callSid) {
-        Context context = getSafeContext();
-        boolean granted =
-            ActivityCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
-        if (granted) {
+        Log.d(TAG, "ensureMicPermissionThenAccept: callSid=" + callSid);
+        if (hasMicrophonePermission()) {
+            Log.d(TAG, "ensureMicPermissionThenAccept: permission granted, proceeding");
             proceedAcceptCall(callSid);
             return;
         }
 
-        // Remember callSid and request via Activity runtime permission API
         pendingCallSidForPermission = callSid;
-        Activity activity = getActivity();
-        if (activity != null) {
-            ActivityCompat.requestPermissions(
-                activity,
-                new String[] { Manifest.permission.RECORD_AUDIO },
-                REQUEST_CODE_RECORD_AUDIO_FOR_ACCEPT
-            );
-        } else if (mainActivityClass != null) {
-            // No current activity; bring app to foreground where permission can be requested
-            Intent launchIntent = new Intent(context, mainActivityClass);
-            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-            launchIntent.putExtra("AUTO_ACCEPT_CALL", true);
-            launchIntent.putExtra(EXTRA_CALL_SID, callSid);
-            context.startActivity(launchIntent);
-        } else {
-            Log.w(TAG, "No activity available to request RECORD_AUDIO permission");
-        }
+        pendingPermissionAction = PendingPermissionAction.ACCEPT_CALL;
+        permissionAttemptCount = 0;
+        Log.d(TAG, "ensureMicPermissionThenAccept: requesting permission for accept flow");
+        requestMicrophonePermission();
     }
 
     // Helper to actually start the service once permission is granted
@@ -433,6 +462,12 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             Log.d(TAG, "Call acceptance started via service (permission granted)");
         } catch (Exception e) {
             Log.e(TAG, "Error accepting call via service", e);
+        } finally {
+            pendingCallSidForPermission = null;
+            if (pendingPermissionAction == PendingPermissionAction.ACCEPT_CALL) {
+                pendingPermissionAction = PendingPermissionAction.NONE;
+            }
+            permissionAttemptCount = 0;
         }
     }
 
@@ -681,11 +716,32 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             return;
         }
 
+        if (pendingOutgoingCall != null) {
+            pendingOutgoingCall.setKeepAlive(false);
+            pendingOutgoingCall.reject("Another call is awaiting microphone permission.");
+            clearOutgoingPermissionState();
+        }
+
         String to = call.getString("to");
         if (to == null) {
             to = ""; // Empty string for echo test
         }
 
+        if (hasMicrophonePermission()) {
+            startOutgoingCall(call, to);
+            return;
+        }
+
+        pendingOutgoingCall = call;
+        pendingOutgoingTo = to;
+        pendingPermissionAction = PendingPermissionAction.OUTGOING_CALL;
+        permissionAttemptCount = 0;
+        call.setKeepAlive(true);
+        requestMicrophonePermission();
+    }
+
+    private void startOutgoingCall(PluginCall call, String to) {
+        Log.d(TAG, "startOutgoingCall: to=" + to);
         // Start call via the foreground service
         Intent serviceIntent = new Intent(getSafeContext(), VoiceCallService.class);
         serviceIntent.setAction(VoiceCallService.ACTION_START_CALL);
@@ -698,11 +754,253 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             JSObject ret = new JSObject();
             ret.put("success", true);
             ret.put("callSid", "pending"); // Will be updated when service connects
+            call.setKeepAlive(false);
             call.resolve(ret);
         } catch (Exception e) {
+            call.setKeepAlive(false);
             Log.e(TAG, "Error starting call service", e);
             call.reject("Failed to start call: " + e.getMessage());
+        } finally {
+            clearOutgoingPermissionState();
         }
+    }
+
+    private boolean hasMicrophonePermission() {
+        return ContextCompat.checkSelfPermission(getSafeContext(), Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private SharedPreferences getPrefs() {
+        return getSafeContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+    }
+
+    private void requestMicrophonePermission() {
+        Activity activity = getActivity();
+        permissionRequestTimestamp = System.currentTimeMillis();
+        permissionAttemptCount++;
+
+        if (activity != null) {
+            ActivityCompat.requestPermissions(
+                activity,
+                new String[] { Manifest.permission.RECORD_AUDIO },
+                REQUEST_CODE_RECORD_AUDIO_FOR_ACCEPT
+            );
+            return;
+        }
+
+        if (mainActivityClass != null) {
+            Context context = getSafeContext();
+            Intent launchIntent = new Intent(context, mainActivityClass);
+            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            if (pendingPermissionAction == PendingPermissionAction.ACCEPT_CALL && pendingCallSidForPermission != null) {
+                launchIntent.putExtra("AUTO_ACCEPT_CALL", true);
+                launchIntent.putExtra(EXTRA_CALL_SID, pendingCallSidForPermission);
+            }
+            context.startActivity(launchIntent);
+        } else {
+            Log.w(TAG, "Unable to request microphone permission - no activity available");
+            handlePermissionFailure();
+        }
+    }
+
+    private void handleMicrophonePermissionGranted() {
+        Log.d(TAG, "handleMicrophonePermissionGranted: pendingAction=" + pendingPermissionAction + ", pendingCall=" + (pendingPermissionCall != null));
+        permissionAttemptCount = 0;
+
+        if (pendingPermissionAction == PendingPermissionAction.OUTGOING_CALL && pendingOutgoingCall != null) {
+            PluginCall call = pendingOutgoingCall;
+            String to = pendingOutgoingTo != null ? pendingOutgoingTo : "";
+            pendingOutgoingCall = null;
+            pendingOutgoingTo = null;
+            pendingPermissionAction = PendingPermissionAction.NONE;
+            startOutgoingCall(call, to);
+            return;
+        }
+
+        if (pendingPermissionAction == PendingPermissionAction.ACCEPT_CALL && pendingCallSidForPermission != null) {
+            String callSid = pendingCallSidForPermission;
+            pendingCallSidForPermission = null;
+            pendingPermissionAction = PendingPermissionAction.NONE;
+            proceedAcceptCall(callSid);
+            return;
+        }
+
+        if (pendingPermissionCall != null) {
+            JSObject ret = new JSObject();
+            ret.put("granted", true);
+            pendingPermissionCall.setKeepAlive(false);
+            pendingPermissionCall.resolve(ret);
+            pendingPermissionCall = null;
+            awaitingSettingsResult = false;
+        }
+
+        pendingPermissionAction = PendingPermissionAction.NONE;
+    }
+
+    private void handleMicrophonePermissionDenied() {
+        Log.d(TAG, "handleMicrophonePermissionDenied invoked");
+        Activity activity = getActivity();
+        if (activity == null) {
+            Log.w(TAG, "handleMicrophonePermissionDenied: no activity");
+            handlePermissionFailure();
+            return;
+        }
+
+        boolean canRequestAgain = ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.RECORD_AUDIO);
+        Log.d(TAG, "handleMicrophonePermissionDenied: canRequestAgain=" + canRequestAgain + ", attempt=" + permissionAttemptCount + ", pendingAction=" + pendingPermissionAction + ", standaloneCall=" + (pendingPermissionCall != null));
+
+        if (pendingPermissionAction == PendingPermissionAction.NONE && pendingPermissionCall != null) {
+            if (canRequestAgain && permissionAttemptCount <= 1) {
+                showStandalonePermissionRationaleDialog(activity, pendingPermissionCall);
+            } else {
+                showStandalonePermissionSettingsDialog(activity, pendingPermissionCall);
+            }
+        } else if (canRequestAgain && permissionAttemptCount <= 1) {
+            showPermissionRationaleDialog(activity);
+        } else {
+            showPermissionSettingsDialog(activity);
+        }
+    }
+
+    private void showPermissionRationaleDialog(Activity activity) {
+        Log.d(TAG, "showPermissionRationaleDialog");
+        new AlertDialog.Builder(activity)
+            .setTitle("Microphone required")
+            .setMessage("Microphone access is required to place and receive calls.")
+            .setPositiveButton("Retry", (dialog, which) -> {
+                dialog.dismiss();
+                requestMicrophonePermission();
+            })
+            .setNegativeButton("Cancel", (dialog, which) -> {
+                dialog.dismiss();
+                handlePermissionFailure();
+            })
+            .setCancelable(false)
+            .show();
+    }
+
+    private void showStandalonePermissionRationaleDialog(Activity activity, PluginCall call) {
+        Log.d(TAG, "showStandalonePermissionRationaleDialog");
+        new AlertDialog.Builder(activity)
+            .setTitle("Microphone required")
+            .setMessage("Microphone access is required to place and receive calls.")
+            .setPositiveButton("Retry", (dialog, which) -> {
+                dialog.dismiss();
+                requestMicrophonePermission();
+            })
+            .setNegativeButton("Cancel", (dialog, which) -> {
+                dialog.dismiss();
+                JSObject ret = new JSObject();
+                ret.put("granted", false);
+                call.setKeepAlive(false);
+                call.resolve(ret);
+                pendingPermissionCall = null;
+                awaitingSettingsResult = false;
+                permissionAttemptCount = 0;
+            })
+            .setCancelable(false)
+            .show();
+    }
+
+    private void showPermissionSettingsDialog(Activity activity) {
+        Log.d(TAG, "showPermissionSettingsDialog");
+        new AlertDialog.Builder(activity)
+            .setTitle("Enable microphone")
+            .setMessage("You can enable the microphone in Settings to use calling features.")
+            .setPositiveButton("Open Settings", (dialog, which) -> {
+                dialog.dismiss();
+                openAppSettings();
+            })
+            .setNegativeButton("Cancel", (dialog, which) -> {
+                dialog.dismiss();
+                handlePermissionFailure();
+            })
+            .setCancelable(false)
+            .show();
+    }
+
+    private void showStandalonePermissionSettingsDialog(Activity activity, PluginCall call) {
+        Log.d(TAG, "showStandalonePermissionSettingsDialog");
+        new AlertDialog.Builder(activity)
+            .setTitle("Enable microphone")
+            .setMessage("Microphone access is required. Open Settings to enable the permission.")
+            .setPositiveButton("Open Settings", (dialog, which) -> {
+                dialog.dismiss();
+                pendingPermissionCall = call;
+                call.setKeepAlive(true);
+                awaitingSettingsResult = true;
+                openAppSettings();
+            })
+            .setNegativeButton("Cancel", (dialog, which) -> {
+                dialog.dismiss();
+                JSObject ret = new JSObject();
+                ret.put("granted", false);
+                call.setKeepAlive(false);
+                call.resolve(ret);
+                pendingPermissionCall = null;
+                awaitingSettingsResult = false;
+                permissionAttemptCount = 0;
+            })
+            .setCancelable(false)
+            .show();
+    }
+
+    private void openAppSettings() {
+        Context context = getSafeContext();
+        if (pendingPermissionCall != null || pendingPermissionAction != PendingPermissionAction.NONE) {
+            awaitingSettingsResult = true;
+        }
+        Log.d(TAG, "openAppSettings: awaitingSettingsResult=" + awaitingSettingsResult + ", pendingAction=" + pendingPermissionAction + ", pendingCall=" + (pendingPermissionCall != null));
+        Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+        intent.setData(Uri.fromParts("package", context.getPackageName(), null));
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        context.startActivity(intent);
+        Toast.makeText(context, "Enable microphone permission and return to the app", Toast.LENGTH_LONG).show();
+    }
+
+    private void handlePermissionFailure() {
+        Log.d(TAG, "handlePermissionFailure: pendingAction=" + pendingPermissionAction + ", pendingCall=" + (pendingPermissionCall != null));
+        if (pendingPermissionAction == PendingPermissionAction.OUTGOING_CALL) {
+            if (pendingOutgoingCall != null) {
+                pendingOutgoingCall.setKeepAlive(false);
+                pendingOutgoingCall.reject("Microphone permission is required to place a call.");
+            }
+            clearOutgoingPermissionState();
+        } else if (pendingPermissionAction == PendingPermissionAction.ACCEPT_CALL) {
+            if (pendingCallSidForPermission != null) {
+                CallInvite invite = activeCallInvites.get(pendingCallSidForPermission);
+                JSObject data = new JSObject();
+                data.put("callSid", pendingCallSidForPermission);
+                data.put("reason", "microphone_permission_denied");
+                if (invite != null) {
+                    if (invite.getFrom() != null) {
+                        data.put("from", invite.getFrom().replace("client:", ""));
+                    }
+                    if (invite.getTo() != null) {
+                        data.put("to", invite.getTo());
+                    }
+                }
+                notifyListeners("callDisconnected", data);
+            }
+            pendingCallSidForPermission = null;
+            pendingPermissionAction = PendingPermissionAction.NONE;
+        } else if (pendingPermissionCall != null) {
+            JSObject ret = new JSObject();
+            ret.put("granted", false);
+            pendingPermissionCall.setKeepAlive(false);
+            pendingPermissionCall.resolve(ret);
+            pendingPermissionCall = null;
+            awaitingSettingsResult = false;
+        }
+        permissionAttemptCount = 0;
+    }
+
+    private void clearOutgoingPermissionState() {
+        pendingOutgoingCall = null;
+        pendingOutgoingTo = null;
+        if (pendingPermissionAction == PendingPermissionAction.OUTGOING_CALL) {
+            pendingPermissionAction = PendingPermissionAction.NONE;
+        }
+        permissionAttemptCount = 0;
     }
 
     // Call parameter creation is now handled by VoiceCallService
@@ -845,25 +1143,64 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
 
     @PluginMethod
     public void requestMicrophonePermission(PluginCall call) {
-        requestPermissions(call);
+        Log.d(TAG, "requestMicrophonePermission invoked");
+        if (hasMicrophonePermission()) {
+            Log.d(TAG, "requestMicrophonePermission: already granted");
+            JSObject ret = new JSObject();
+            ret.put("granted", true);
+            call.resolve(ret);
+            return;
+        }
+
+        Activity activity = getActivity();
+        if (activity == null) {
+            Log.w(TAG, "requestMicrophonePermission: no activity available");
+            call.reject("Unable to request permission without an active activity");
+            return;
+        }
+
+        SharedPreferences prefs = getPrefs();
+        boolean requestedBefore = prefs.getBoolean(PREF_MIC_PERMISSION_REQUESTED, false);
+        boolean shouldShow = ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.RECORD_AUDIO);
+        Log.d(TAG, "requestMicrophonePermission: requestedBefore=" + requestedBefore + ", shouldShow=" + shouldShow + ", pendingAction=" + pendingPermissionAction);
+
+        if (pendingPermissionAction == PendingPermissionAction.NONE && !shouldShow && requestedBefore) {
+            showStandalonePermissionSettingsDialog(activity, call);
+            return;
+        }
+
+        prefs.edit().putBoolean(PREF_MIC_PERMISSION_REQUESTED, true).apply();
+
+        if (pendingPermissionAction == PendingPermissionAction.NONE) {
+            pendingPermissionCall = call;
+            call.setKeepAlive(true);
+        }
+        awaitingSettingsResult = false;
+        permissionAttemptCount++;
+        permissionRequestTimestamp = System.currentTimeMillis();
+        Log.d(TAG, "requestMicrophonePermission: invoking ActivityCompat.requestPermissions (attempt " + permissionAttemptCount + ")");
+
+        ActivityCompat.requestPermissions(
+            activity,
+            new String[] { Manifest.permission.RECORD_AUDIO },
+            REQUEST_CODE_RECORD_AUDIO_FOR_ACCEPT
+        );
     }
 
     @Override
     protected void handleRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.handleRequestPermissionsResult(requestCode, permissions, grantResults);
 
-        // If we were waiting to accept a call after mic permission
-        if (pendingCallSidForPermission != null) {
-            boolean granted =
-                ActivityCompat.checkSelfPermission(getSafeContext(), Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
-            String callSid = pendingCallSidForPermission;
-            pendingCallSidForPermission = null;
-            if (granted) {
-                Log.d(TAG, "RECORD_AUDIO granted from permission flow; proceeding to accept call");
-                proceedAcceptCall(callSid);
-            } else {
-                Log.w(TAG, "RECORD_AUDIO denied; cannot accept call");
-            }
+        if (requestCode != REQUEST_CODE_RECORD_AUDIO_FOR_ACCEPT) {
+            return;
+        }
+
+        boolean granted = hasMicrophonePermission();
+        Log.d(TAG, "handleRequestPermissionsResult: granted=" + granted + ", attempt=" + permissionAttemptCount + ", pendingAction=" + pendingPermissionAction + ", standaloneCall=" + (pendingPermissionCall != null));
+        if (granted) {
+            handleMicrophonePermissionGranted();
+        } else {
+            handleMicrophonePermissionDenied();
         }
     }
 
