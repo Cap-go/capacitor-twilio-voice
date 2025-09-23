@@ -106,6 +106,21 @@ class TwilioVoiceApp {
         this.handleIncomingCall(data);
       });
 
+      await CapacitorTwilioVoice.addListener('callInviteCancelled', (data) => {
+        console.log('Call invite cancelled:', data);
+        this.handleCallInviteCancelled(data);
+      });
+
+      await CapacitorTwilioVoice.addListener('outgoingCallInitiated', (data) => {
+        console.log('Outgoing call initiated:', data);
+        this.handleOutgoingCallInitiated(data);
+      });
+
+      await CapacitorTwilioVoice.addListener('outgoingCallFailed', (data) => {
+        console.warn('Outgoing call failed:', data);
+        this.handleOutgoingCallFailed(data);
+      });
+
       // Listen for call state changes
       await CapacitorTwilioVoice.addListener('callRinging', (data) => {
         console.log('Call ringing:', data.callSid);
@@ -296,7 +311,7 @@ class TwilioVoiceApp {
   }
 
   async fetchAccessToken(identity) {
-    const backendUrl = 'https://twilio-backend-82.localcan.dev';
+    const backendUrl = 'https://twilio-backend-61.localcan.dev';
     
     // Detect platform dynamically
     const platform = Capacitor.getPlatform(); // 'ios', 'android', or 'web'
@@ -489,6 +504,74 @@ class TwilioVoiceApp {
     
     // Show the incoming call screen
     this.showIncomingCallScreen(data.callerName || data.from);
+  }
+
+  handleOutgoingCallInitiated(data) {
+    this.currentCallSid = data.callSid;
+
+    if (data.source === 'system') {
+      const targetLabel = data.displayName || data.to || 'Unknown';
+      this.showCallContainer();
+      this.isConnecting = true;
+      this.startSpinning();
+      this.callButton.textContent = 'Connecting...';
+      this.callButton.disabled = true;
+      this.callInfo.textContent = `Calling ${targetLabel}...`;
+      this.callControls.classList.add('visible');
+
+      if (data.to) {
+        this.phoneInput.value = data.to;
+      }
+
+      this.showStatus(`System initiating call to ${targetLabel}`, 'info');
+    }
+  }
+
+  handleOutgoingCallFailed(data) {
+    if (this.currentCallSid && data.callSid && this.currentCallSid !== data.callSid) {
+      return;
+    }
+
+    this.isConnecting = false;
+    this.isCallActive = false;
+    this.currentCallSid = null;
+    this.stopSpinning();
+    this.resetCallButton();
+    this.callControls.classList.remove('visible');
+    this.callInfo.textContent = '';
+
+    const targetLabel = data.displayName || data.to || 'the contact';
+    let message = `Call failed to connect to ${targetLabel}`;
+    if (data.reason === 'missing_access_token') {
+      message = 'Login required before placing a call.';
+      this.showLoginContainer();
+    } else if (data.reason === 'microphone_permission_denied') {
+      message = 'Microphone permission required before placing a call.';
+    } else if (data.reason === 'invalid_contact') {
+      message = 'Unable to read the contact details for this call.';
+    } else if (data.reason === 'no_call_details') {
+      message = 'CallKit did not provide the contact details for the call.';
+    } else if (data.reason === 'callkit_request_failed') {
+      message = 'Unable to start the call through CallKit.';
+    } else if (data.reason === 'unsupported_intent') {
+      message = 'System provided an unsupported call intent.';
+    }
+
+    this.showStatus(message, 'error');
+  }
+
+  handleCallInviteCancelled(data) {
+    if (!this.pendingCallInvite || this.pendingCallInvite.callSid !== data.callSid) {
+      return;
+    }
+
+    this.hideIncomingCallScreen();
+
+    if (data.reason === 'remote_cancelled') {
+      this.showStatus('Caller cancelled the invitation', 'info');
+    } else {
+      this.showStatus('Call rejected', 'success');
+    }
   }
 
   showIncomingCallScreen(callerName) {
