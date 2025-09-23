@@ -3,6 +3,7 @@ package ee.forgr.capacitor_twilio_voice;
 import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.KeyguardManager;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -20,8 +21,8 @@ import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.IBinder;
-import android.os.VibrationEffect;
 import android.os.Vibrator;
+import android.os.VibrationEffect;
 import android.util.Base64;
 import android.util.Log;
 import android.widget.Toast;
@@ -38,6 +39,8 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.messaging.FirebaseMessaging;
@@ -60,6 +63,7 @@ import java.util.UUID;
 import org.json.JSONException;
 import org.json.JSONObject;
 import android.provider.Settings;
+import android.app.KeyguardManager;
 
 @CapacitorPlugin(
     name = "CapacitorTwilioVoice",
@@ -120,6 +124,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
     private long permissionRequestTimestamp = 0L;
     private int permissionAttemptCount = 0;
     private boolean awaitingSettingsResult = false;
+    private ActivityResultLauncher<String[]> micPermissionLauncher;
 
     // Voice Call Service
     private VoiceCallService voiceCallService;
@@ -168,6 +173,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
                 data.put("error", error.getMessage());
             }
             notifyListeners("callDisconnected", data);
+            moveAppToBackgroundIfLocked();
         }
 
         @Override
@@ -258,6 +264,10 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         bindToVoiceCallService();
 
         Log.d(TAG, "CapacitorTwilioVoice plugin loaded");
+
+        micPermissionLauncher =
+            getBridge()
+                .registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), permissions -> handleMicPermissionResult(permissions));
     }
 
     private void bindToVoiceCallService() {
@@ -392,6 +402,10 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             pendingPermissionCall.setKeepAlive(false);
             pendingPermissionCall.resolve(ret);
             pendingPermissionCall = null;
+        } else if (awaitingSettingsResult && pendingPermissionAction == PendingPermissionAction.ACCEPT_CALL) {
+            awaitingSettingsResult = false;
+            Log.d(TAG, "handleOnResume: settings return without permission for accept flow");
+            handlePermissionFailure();
         } else if (pendingPermissionCall != null) {
             Log.d(TAG, "handleOnResume: permission denied from dialog, invoking fallback handling");
             handleMicrophonePermissionDenied();
@@ -440,7 +454,8 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         pendingCallSidForPermission = callSid;
         pendingPermissionAction = PendingPermissionAction.ACCEPT_CALL;
         permissionAttemptCount = 0;
-        Log.d(TAG, "ensureMicPermissionThenAccept: requesting permission for accept flow");
+        awaitingSettingsResult = false;
+        Log.d(TAG, "ensureMicPermissionThenAccept: requesting permission before accepting call");
         requestMicrophonePermission();
     }
 
@@ -779,11 +794,18 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         permissionAttemptCount++;
 
         if (activity != null) {
-            ActivityCompat.requestPermissions(
-                activity,
-                new String[] { Manifest.permission.RECORD_AUDIO },
-                REQUEST_CODE_RECORD_AUDIO_FOR_ACCEPT
-            );
+            activity.runOnUiThread(() -> {
+                Log.d(TAG, "requestMicrophonePermission: requesting RECORD_AUDIO (attempt " + permissionAttemptCount + ")");
+                if (micPermissionLauncher != null) {
+                    micPermissionLauncher.launch(new String[] { Manifest.permission.RECORD_AUDIO });
+                } else {
+                    ActivityCompat.requestPermissions(
+                        activity,
+                        new String[] { Manifest.permission.RECORD_AUDIO },
+                        REQUEST_CODE_RECORD_AUDIO_FOR_ACCEPT
+                    );
+                }
+            });
             return;
         }
 
@@ -795,10 +817,21 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
                 launchIntent.putExtra("AUTO_ACCEPT_CALL", true);
                 launchIntent.putExtra(EXTRA_CALL_SID, pendingCallSidForPermission);
             }
+            Log.d(TAG, "requestMicrophonePermission: launching activity to request permission");
             context.startActivity(launchIntent);
         } else {
             Log.w(TAG, "Unable to request microphone permission - no activity available");
             handlePermissionFailure();
+        }
+    }
+
+    private void handleMicPermissionResult(Map<String, Boolean> permissions) {
+        Boolean granted = permissions.get(Manifest.permission.RECORD_AUDIO);
+        Log.d(TAG, "handleMicPermissionResult: granted=" + granted + ", pendingAction=" + pendingPermissionAction);
+        if (granted != null && granted) {
+            handleMicrophonePermissionGranted();
+        } else {
+            handleMicrophonePermissionDenied();
         }
     }
 
@@ -816,11 +849,18 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             return;
         }
 
-        if (pendingPermissionAction == PendingPermissionAction.ACCEPT_CALL && pendingCallSidForPermission != null) {
-            String callSid = pendingCallSidForPermission;
-            pendingCallSidForPermission = null;
+        if (pendingPermissionAction == PendingPermissionAction.ACCEPT_CALL) {
+            if (pendingCallSidForPermission != null) {
+                String callSid = pendingCallSidForPermission;
+                pendingCallSidForPermission = null;
+                pendingPermissionAction = PendingPermissionAction.NONE;
+                proceedAcceptCall(callSid);
+                return;
+            }
+
             pendingPermissionAction = PendingPermissionAction.NONE;
-            proceedAcceptCall(callSid);
+            awaitingSettingsResult = false;
+            permissionAttemptCount = 0;
             return;
         }
 
@@ -908,7 +948,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             .setMessage("You can enable the microphone in Settings to use calling features.")
             .setPositiveButton("Open Settings", (dialog, which) -> {
                 dialog.dismiss();
-                openAppSettings();
+                ensureUnlockedThenOpenSettings();
             })
             .setNegativeButton("Cancel", (dialog, which) -> {
                 dialog.dismiss();
@@ -928,7 +968,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
                 pendingPermissionCall = call;
                 call.setKeepAlive(true);
                 awaitingSettingsResult = true;
-                openAppSettings();
+                ensureUnlockedThenOpenSettings();
             })
             .setNegativeButton("Cancel", (dialog, which) -> {
                 dialog.dismiss();
@@ -957,6 +997,52 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         Toast.makeText(context, "Enable microphone permission and return to the app", Toast.LENGTH_LONG).show();
     }
 
+    private boolean isDeviceLocked() {
+        KeyguardManager km = (KeyguardManager) getSafeContext().getSystemService(Context.KEYGUARD_SERVICE);
+        return km != null && km.isKeyguardLocked();
+    }
+
+    private void ensureUnlockedThenOpenSettings() {
+        Activity activity = getActivity();
+        if (activity == null) {
+            Log.w(TAG, "ensureUnlockedThenOpenSettings: no activity available");
+            openAppSettings();
+            return;
+        }
+
+        KeyguardManager km = (KeyguardManager) getSafeContext().getSystemService(Context.KEYGUARD_SERVICE);
+        if (km == null || !km.isKeyguardLocked()) {
+            openAppSettings();
+            return;
+        }
+
+        km.requestDismissKeyguard(activity, new KeyguardManager.KeyguardDismissCallback() {
+            @Override
+            public void onDismissSucceeded() {
+                Log.d(TAG, "Keyguard dismissed, opening settings");
+                openAppSettings();
+            }
+
+            @Override
+            public void onDismissCancelled() {
+                Log.d(TAG, "Keyguard dismissal cancelled");
+            }
+
+            @Override
+            public void onDismissError() {
+                Log.w(TAG, "Keyguard dismissal error");
+            }
+        });
+    }
+
+    private void moveAppToBackgroundIfLocked() {
+        Activity activity = getActivity();
+        if (activity != null && isDeviceLocked()) {
+            Log.d(TAG, "moveAppToBackgroundIfLocked: moving task to back");
+            activity.moveTaskToBack(true);
+        }
+    }
+
     private void handlePermissionFailure() {
         Log.d(TAG, "handlePermissionFailure: pendingAction=" + pendingPermissionAction + ", pendingCall=" + (pendingPermissionCall != null));
         if (pendingPermissionAction == PendingPermissionAction.OUTGOING_CALL) {
@@ -968,6 +1054,15 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         } else if (pendingPermissionAction == PendingPermissionAction.ACCEPT_CALL) {
             if (pendingCallSidForPermission != null) {
                 CallInvite invite = activeCallInvites.get(pendingCallSidForPermission);
+                if (invite != null) {
+                    dismissIncomingCallNotification();
+                    activeCallInvites.remove(pendingCallSidForPermission);
+                    try {
+                        invite.reject(getSafeContext());
+                    } catch (Exception ex) {
+                        Log.w(TAG, "handlePermissionFailure: failed to reject invite", ex);
+                    }
+                }
                 JSObject data = new JSObject();
                 data.put("callSid", pendingCallSidForPermission);
                 data.put("reason", "microphone_permission_denied");
@@ -983,6 +1078,9 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             }
             pendingCallSidForPermission = null;
             pendingPermissionAction = PendingPermissionAction.NONE;
+            awaitingSettingsResult = false;
+            pendingPermissionCall = null;
+            moveAppToBackgroundIfLocked();
         } else if (pendingPermissionCall != null) {
             JSObject ret = new JSObject();
             ret.put("granted", false);
@@ -1050,6 +1148,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         JSObject ret = new JSObject();
         ret.put("success", true);
         call.resolve(ret);
+        moveAppToBackgroundIfLocked();
     }
 
     @PluginMethod
@@ -1614,6 +1713,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             notifyListeners("callDisconnected", data);
 
             Log.d(TAG, "Call rejected from notification");
+            moveAppToBackgroundIfLocked();
         } else {
             Log.e(TAG, "Call invite not found for SID: " + callSid);
         }
