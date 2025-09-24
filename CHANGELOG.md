@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.3.0-alpha.1](https://github.com/Cap-go/capacitor-twilio-voice/compare/7.3.0-alpha.0...7.3.0-alpha.1) (2025-09-23)
+
+
+### Features
+
+* lint ([5464961](https://github.com/Cap-go/capacitor-twilio-voice/commit/54649616320e31d6ec49ecb2d4eebda3c559c5bb))
+
 ## [7.3.0-alpha.0](https://github.com/Cap-go/capacitor-twilio-voice/compare/7.2.6...7.3.0-alpha.0) (2025-09-23)
 
 
