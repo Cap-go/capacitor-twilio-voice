@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.3.0-alpha.2](https://github.com/Cap-go/capacitor-twilio-voice/compare/7.3.0-alpha.1...7.3.0-alpha.2) (2025-09-24)
+
+
+### Bug Fixes
+
+* unify callInviteReceived between platforms ([3c800f8](https://github.com/Cap-go/capacitor-twilio-voice/commit/3c800f8229b2a9af4296dfc169600daa81532704))
+
 ## [7.3.0-alpha.1](https://github.com/Cap-go/capacitor-twilio-voice/compare/7.3.0-alpha.0...7.3.0-alpha.1) (2025-09-23)
 
 
