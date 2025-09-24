@@ -967,6 +967,7 @@ extension CapacitorTwilioVoicePlugin: NotificationDelegate {
         notifyListeners("callInviteReceived", data: [
             "callSid": callInvite.uuid.uuidString,
             "from": from,
+            "callerDisplayName": niceName,
             "to": callInvite.to,
             "customParams": callInvite.customParameters ?? [:]
         ])

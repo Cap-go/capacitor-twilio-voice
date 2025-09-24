@@ -1709,7 +1709,8 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
 
         JSObject data = new JSObject();
         data.put("callSid", callSid);
-        data.put("from", callerName);
+        data.put("from", callInvite.getFrom());
+        data.put("callerDisplayName", callerName);
         data.put("to", callInvite.getTo());
         data.put("customParams", new JSONObject(params));
         notifyListeners("callInviteReceived", data);

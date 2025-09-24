@@ -30,7 +30,7 @@ export interface CapacitorTwilioVoicePlugin {
   // Listeners for events
   addListener(
     eventName: 'callInviteReceived',
-    listenerFunc: (data: { callSid: string; from: string; to: string; customParams: Record<string, string> }) => void,
+    listenerFunc: (data: { callSid: string; from: string; callerDisplayName: string; to: string; customParams: Record<string, string> }) => void,
   ): Promise<PluginListenerHandle>;
 
   addListener(
