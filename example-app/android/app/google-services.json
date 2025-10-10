@@ -9,7 +9,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:1016378606521:android:4fb09a45e487cf0f37ac68",
         "android_client_info": {
-          "package_name": "com.example.plugin"
+          "package_name": "app.capgo.twilio.voice"
         }
       },
       "oauth_client": [],
