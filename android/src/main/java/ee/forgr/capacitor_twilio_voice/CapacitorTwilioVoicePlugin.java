@@ -270,12 +270,12 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
 
                             // Delay the auto-accept slightly to ensure plugin is fully loaded
                             new android.os.Handler().postDelayed(
-                                    () -> {
-                                        Log.d(TAG, "Auto-accepting call: " + callSid);
-                                        ensureMicPermissionThenAccept(callSid);
-                                    },
-                                    500
-                                );
+                                () -> {
+                                    Log.d(TAG, "Auto-accepting call: " + callSid);
+                                    ensureMicPermissionThenAccept(callSid);
+                                },
+                                500
+                            );
                         }
                     }
                 }
@@ -309,20 +309,20 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
                         if (callInvite != null) {
                             // Delay sending the event to ensure JavaScript is ready
                             new android.os.Handler().postDelayed(
-                                    () -> {
-                                        Log.d(TAG, "Sending incoming call event to JavaScript: " + callSid);
+                                () -> {
+                                    Log.d(TAG, "Sending incoming call event to JavaScript: " + callSid);
 
-                                        JSObject data = new JSObject();
-                                        data.put("callSid", callSid);
-                                        data.put("from", callFrom);
-                                        data.put("to", callInvite.getTo());
-                                        data.put("callerName", callerName != null ? callerName : callFrom);
-                                        data.put("openedFromNotification", true);
+                                    JSObject data = new JSObject();
+                                    data.put("callSid", callSid);
+                                    data.put("from", callFrom);
+                                    data.put("to", callInvite.getTo());
+                                    data.put("callerName", callerName != null ? callerName : callFrom);
+                                    data.put("openedFromNotification", true);
 
-                                        notifyListeners("callInviteReceived", data);
-                                    },
-                                    1000
-                                ); // Give JavaScript more time to initialize
+                                    notifyListeners("callInviteReceived", data);
+                                },
+                                1000
+                            ); // Give JavaScript more time to initialize
                         } else {
                             Log.w(TAG, "Call invite not found for SID: " + callSid + " (may have been cancelled)");
                         }

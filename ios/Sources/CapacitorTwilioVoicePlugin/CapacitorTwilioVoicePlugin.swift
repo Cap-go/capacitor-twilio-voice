@@ -62,7 +62,7 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
     deinit {
         // Remove observers
         NotificationCenter.default.removeObserver(self)
-        
+
         // CallKit has an odd API contract where the developer must call invalidate or the CXProvider is leaked.
         if let provider = callKitProvider {
             provider.invalidate()
@@ -100,23 +100,23 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
     private func setupAudioSession() {
         do {
             let audioSession = AVAudioSession.sharedInstance()
-            try audioSession.setCategory(.playAndRecord, 
-                                       mode: .voiceChat, 
-                                       options: [.allowBluetooth, .allowBluetoothA2DP, .allowAirPlay])
+            try audioSession.setCategory(.playAndRecord,
+                                         mode: .voiceChat,
+                                         options: [.allowBluetooth, .allowBluetoothA2DP, .allowAirPlay])
             try audioSession.setActive(true)
             NSLog("Audio session configured successfully")
         } catch {
             NSLog("Failed to configure audio session: \(error.localizedDescription)")
         }
     }
-    
+
     private func setupAudioDevice() {
         TwilioVoiceSDK.audioDevice = audioDevice
 
         // Set default audio routing to earpiece (not speaker)
         toggleAudioRoute(toSpeaker: false)
     }
-    
+
     private func setupNotifications() {
         NotificationCenter.default.addObserver(
             self,
@@ -124,7 +124,7 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
             name: AVAudioSession.mediaServicesWereResetNotification,
             object: nil
         )
-        
+
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleAudioSessionInterruption),
@@ -132,34 +132,34 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
             object: nil
         )
     }
-    
+
     @objc private func handleMediaServicesReset() {
         NSLog("Media services were reset, reconfiguring audio session")
         setupAudioSession()
-        
+
         // Re-enable audio device
         audioDevice.isEnabled = true
-        
+
         // Notify listeners about the reset
         notifyListeners("audioSessionReset", data: nil)
     }
-    
+
     @objc private func handleAudioSessionInterruption(notification: Notification) {
         guard let userInfo = notification.userInfo,
               let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
               let type = AVAudioSession.InterruptionType(rawValue: typeValue) else {
             return
         }
-        
+
         switch type {
         case .began:
             NSLog("Audio session interruption began")
             audioDevice.isEnabled = false
             notifyListeners("audioSessionInterrupted", data: ["type": "began"])
-            
+
         case .ended:
             NSLog("Audio session interruption ended")
-            
+
             // Check if we should resume
             if let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt {
                 let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
@@ -174,9 +174,9 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
                     }
                 }
             }
-            
+
             notifyListeners("audioSessionInterrupted", data: ["type": "ended"])
-            
+
         @unknown default:
             break
         }
@@ -574,37 +574,37 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
         audioDevice.block = {
             do {
                 let audioSession = AVAudioSession.sharedInstance()
-                
+
                 // Ensure audio session is active before changing routing
                 if !audioSession.isOtherAudioPlaying {
                     try audioSession.setActive(true)
                 }
-                
+
                 if toSpeaker {
                     try audioSession.overrideOutputAudioPort(.speaker)
                 } else {
                     try audioSession.overrideOutputAudioPort(.none)
                 }
-                
+
                 NSLog("Audio route changed to: \(toSpeaker ? "speaker" : "earpiece")")
             } catch {
                 NSLog("Failed to change audio route: \(error.localizedDescription)")
-                
+
                 // Try to recover by reconfiguring the audio session
                 do {
                     let audioSession = AVAudioSession.sharedInstance()
-                    try audioSession.setCategory(.playAndRecord, 
-                                               mode: .voiceChat, 
-                                               options: [.allowBluetooth, .allowBluetoothA2DP, .allowAirPlay])
+                    try audioSession.setCategory(.playAndRecord,
+                                                 mode: .voiceChat,
+                                                 options: [.allowBluetooth, .allowBluetoothA2DP, .allowAirPlay])
                     try audioSession.setActive(true)
-                    
+
                     // Retry the audio route change
                     if toSpeaker {
                         try audioSession.overrideOutputAudioPort(.speaker)
                     } else {
                         try audioSession.overrideOutputAudioPort(.none)
                     }
-                    
+
                     NSLog("Audio route recovered and changed to: \(toSpeaker ? "speaker" : "earpiece")")
                 } catch {
                     NSLog("Failed to recover audio route: \(error.localizedDescription)")
@@ -965,12 +965,12 @@ extension CapacitorTwilioVoicePlugin: CXProviderDelegate {
 
     public func provider(_ provider: CXProvider, didActivate audioSession: AVAudioSession) {
         NSLog("CallKit activated audio session")
-        
+
         // Configure the audio session for VoIP calls
         do {
-            try audioSession.setCategory(.playAndRecord, 
-                                       mode: .voiceChat, 
-                                       options: [.allowBluetooth, .allowBluetoothA2DP, .allowAirPlay])
+            try audioSession.setCategory(.playAndRecord,
+                                         mode: .voiceChat,
+                                         options: [.allowBluetooth, .allowBluetoothA2DP, .allowAirPlay])
             audioDevice.isEnabled = true
             NSLog("Audio session activated and configured for call")
         } catch {
