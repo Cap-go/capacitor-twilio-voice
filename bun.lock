@@ -1282,6 +1282,8 @@
 
     "@twilio/cli-core/@oclif/plugin-plugins": ["@oclif/plugin-plugins@2.1.0", "", { "dependencies": { "@oclif/color": "^1.0.1", "@oclif/core": "^1.2.0", "chalk": "^4.1.2", "debug": "^4.1.0", "fs-extra": "^9.0", "http-call": "^5.2.2", "load-json-file": "^5.3.0", "npm-run-path": "^4.0.1", "semver": "^7.3.2", "tslib": "^2.0.0", "yarn": "^1.22.17" } }, "sha512-Bgt+QpTlX7+Q0HkVgtbUGYQlo/hyzNBAaXH5l16ou9Ji5wfi5T+niV5AzQ14R7JF8ZDOTbUOU/NRBJ2bzLCaZQ=="],
 
+    "@types/cli-progress/@types/node": ["@types/node@22.18.10", "", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-anNG/V/Efn/YZY4pRzbACnKxNKoBng2VTFydVu8RRs5hQjikP8CQfaeAV59VFSCzKNp90mXiVXW2QzV56rwMrg=="],
+
     "@types/mute-stream/@types/node": ["@types/node@22.18.10", "", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-anNG/V/Efn/YZY4pRzbACnKxNKoBng2VTFydVu8RRs5hQjikP8CQfaeAV59VFSCzKNp90mXiVXW2QzV56rwMrg=="],
 
     "@typescript-eslint/utils/eslint-scope": ["eslint-scope@5.1.1", "", { "dependencies": { "esrecurse": "^4.3.0", "estraverse": "^4.1.1" } }, "sha512-2NxwbF/hZ0KpepYN0cNbo+FN6XoK7GaHlQhgx/hIZl6Va0bF45RQOOwhLIy8lQDbuCiadSLCBnH2CFYquit5bw=="],
