@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.2.15](https://github.com/Cap-go/capacitor-twilio-voice/compare/7.2.14...7.2.15) (2025-10-15)
+
+
+### Bug Fixes
+
+* lock and lint ([2564fa9](https://github.com/Cap-go/capacitor-twilio-voice/commit/2564fa9985082da50dd60e67f45c8ae27d187b19))
+* lock and lint ([10548ff](https://github.com/Cap-go/capacitor-twilio-voice/commit/10548ff5f32cc2f5912f00b8c2ea02c70ae9b457))
+
 ## [7.2.14](https://github.com/Cap-go/capacitor-twilio-voice/compare/7.2.13...7.2.14) (2025-10-15)
 
 
