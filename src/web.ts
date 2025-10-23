@@ -61,4 +61,8 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
   async requestMicrophonePermission(): Promise<{ granted: boolean }> {
     throw this.unimplemented('Not implemented on web.');
   }
+
+  async getPluginVersion(): Promise<{ version: string }> {
+    return { version: 'web' };
+  }
 }

@@ -67,6 +67,8 @@ import org.json.JSONObject;
 )
 public class CapacitorTwilioVoicePlugin extends Plugin {
 
+    private final String PLUGIN_VERSION = "";
+
     private static final String TAG = "CapacitorTwilioVoice";
     private static final String PREF_ACCESS_TOKEN = "twilio_access_token";
     private static final String PREF_FCM_TOKEN = "twilio_fcm_token";
@@ -1278,6 +1280,17 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             Log.d(TAG, "Call rejected from notification");
         } else {
             Log.e(TAG, "Call invite not found for SID: " + callSid);
+        }
+    }
+
+    @PluginMethod
+    public void getPluginVersion(final PluginCall call) {
+        try {
+            final JSObject ret = new JSObject();
+            ret.put("version", this.PLUGIN_VERSION);
+            call.resolve(ret);
+        } catch (final Exception e) {
+            call.reject("Could not get plugin version", e);
         }
     }
 }

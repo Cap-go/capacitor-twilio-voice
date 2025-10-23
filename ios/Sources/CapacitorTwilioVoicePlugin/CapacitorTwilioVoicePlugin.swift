@@ -26,6 +26,7 @@ public protocol PushKitEventDelegate: AnyObject {
  */
 @objc(CapacitorTwilioVoicePlugin)
 public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEventDelegate {
+    private let PLUGIN_VERSION: String = ""
 
     public let identifier = "CapacitorTwilioVoicePlugin"
     public let jsName = "CapacitorTwilioVoice"
@@ -42,7 +43,8 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
 
         CAPPluginMethod(name: "getCallStatus", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "checkMicrophonePermission", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "requestMicrophonePermission", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "requestMicrophonePermission", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getPluginVersion", returnType: CAPPluginReturnPromise)
     ]
 
     // MARK: - Properties
@@ -1044,4 +1046,9 @@ extension CapacitorTwilioVoicePlugin: AVAudioPlayerDelegate {
             NSLog("Audio player decode error: \(error.localizedDescription)")
         }
     }
+
+    @objc func getPluginVersion(_ call: CAPPluginCall) {
+        call.resolve(["version": self.PLUGIN_VERSION])
+    }
+
 }
