@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.3.1](https://github.com/Cap-go/capacitor-twilio-voice/compare/7.3.0...7.3.1) (2025-10-23)
+
+
+### Bug Fixes
+
+* remove footer in discord ([6747de9](https://github.com/Cap-go/capacitor-twilio-voice/commit/6747de926171e6f9a006da678267c2173d39bb0d))
+* update Discord release notification username to include repository name ([f6d4800](https://github.com/Cap-go/capacitor-twilio-voice/commit/f6d4800442ae2d36870cbc671599d2045d5eebd7))
+
 ## [7.3.0](https://github.com/Cap-go/capacitor-twilio-voice/compare/7.2.17...7.3.0) (2025-10-23)
 
 
