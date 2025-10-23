@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.3.0](https://github.com/Cap-go/capacitor-twilio-voice/compare/7.2.17...7.3.0) (2025-10-23)
+
+
+### Features
+
+* add plugin version retrieval method and update workflows for changelog generation ([e014f21](https://github.com/Cap-go/capacitor-twilio-voice/commit/e014f2144308eeae8b64b8a8c061c5f720c61e82))
+
+
+### Bug Fixes
+
+* remove unnecessary content field from Discord release notification ([defe899](https://github.com/Cap-go/capacitor-twilio-voice/commit/defe899258a2dcf47f22137b47177ec4a0187409))
+
 ## [7.2.17](https://github.com/Cap-go/capacitor-twilio-voice/compare/7.2.16...7.2.17) (2025-10-16)
 
 ## [7.2.16](https://github.com/Cap-go/capacitor-twilio-voice/compare/7.2.15...7.2.16) (2025-10-15)
