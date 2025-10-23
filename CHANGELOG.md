@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.3.2](https://github.com/Cap-go/capacitor-twilio-voice/compare/7.3.1...7.3.2) (2025-10-23)
+
+
+### Bug Fixes
+
+* reorder interface definitions and update getPluginVersion return type ([21da6b5](https://github.com/Cap-go/capacitor-twilio-voice/commit/21da6b52c4603158327d504236f6c16c7442be12))
+
 ## [7.3.1](https://github.com/Cap-go/capacitor-twilio-voice/compare/7.3.0...7.3.1) (2025-10-23)
 
 
