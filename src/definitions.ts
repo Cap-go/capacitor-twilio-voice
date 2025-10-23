@@ -71,16 +71,16 @@ export interface CapacitorTwilioVoicePlugin {
   ): Promise<PluginListenerHandle>;
 
   removeAllListeners(): Promise<void>;
-}
-
-export interface PluginListenerHandle {
-  remove(): Promise<void>;
 
   /**
    * Get the native Capacitor plugin version
    *
-   * @returns {Promise<{ id: string }>} an Promise with version for this device
-   * @throws An error if the something went wrong
+   * @returns {Promise<{ version: string }>} a Promise with version for this plugin
+   * @throws An error if something went wrong
    */
   getPluginVersion(): Promise<{ version: string }>;
+}
+
+export interface PluginListenerHandle {
+  remove(): Promise<void>;
 }
