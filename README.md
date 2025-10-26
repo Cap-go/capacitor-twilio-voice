@@ -8,6 +8,10 @@
 
 A Capacitor plugin for integrating Twilio Voice calling functionality into iOS and Android applications.
 
+## Documentation
+
+The most complete doc is available here: https://capgo.app/docs/plugins/twilio-voice/
+
 ## Installation
 
 ```bash
