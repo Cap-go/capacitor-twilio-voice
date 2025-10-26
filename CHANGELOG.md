@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.6.0](https://github.com/Cap-go/capacitor-twilio-voice/compare/7.5.0...7.6.0) (2025-10-26)
+
+
+### Features
+
+* add comprehensive API documentation for Twilio Voice plugin ([6f01857](https://github.com/Cap-go/capacitor-twilio-voice/commit/6f01857036976d9e020010644b77e0b8d34eaa3d))
+
 ## [7.5.0](https://github.com/Cap-go/capacitor-twilio-voice/compare/7.4.3...7.5.0) (2025-10-26)
 
 

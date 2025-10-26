@@ -27,7 +27,7 @@ public protocol PushKitEventDelegate: AnyObject {
  */
 @objc(CapacitorTwilioVoicePlugin)
 public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEventDelegate {
-    private let PLUGIN_VERSION: String = "7.5.0"
+    private let PLUGIN_VERSION: String = "7.6.0"
 
     public let identifier = "CapacitorTwilioVoicePlugin"
     public let jsName = "CapacitorTwilioVoice"
