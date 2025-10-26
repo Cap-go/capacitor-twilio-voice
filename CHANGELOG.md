@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.4.0](https://github.com/Cap-go/capacitor-twilio-voice/compare/7.3.2...7.4.0) (2025-10-26)
+
+
+### Features
+
+* custom params Andorid ([7ddb1a1](https://github.com/Cap-go/capacitor-twilio-voice/commit/7ddb1a1979c38bb0e129a4fa36a0be813755289e))
+* improve microphone handling and general behavior of Android ([efbb15a](https://github.com/Cap-go/capacitor-twilio-voice/commit/efbb15a95ca574d1f49665df0a408b04d6e68643))
+* improve microphone permission for outgoing call for Android ([082cbce](https://github.com/Cap-go/capacitor-twilio-voice/commit/082cbce2c18f2131653d4b43b30ad74b124d19d9))
+* iOS intent for starting call && custom params for iOS ([4b16785](https://github.com/Cap-go/capacitor-twilio-voice/commit/4b1678583def1da8f2cda927a1649bbdd077c491))
+
 ## [7.3.2](https://github.com/Cap-go/capacitor-twilio-voice/compare/7.3.1...7.3.2) (2025-10-23)
 
 
