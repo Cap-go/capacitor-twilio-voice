@@ -393,13 +393,13 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         Log.d(
             TAG,
             "handleOnResume: hasPermission=" +
-            hasMicrophonePermission() +
-            ", awaitingSettings=" +
-            awaitingSettingsResult +
-            ", pendingCall=" +
-            (pendingPermissionCall != null) +
-            ", pendingAction=" +
-            pendingPermissionAction
+                hasMicrophonePermission() +
+                ", awaitingSettings=" +
+                awaitingSettingsResult +
+                ", pendingCall=" +
+                (pendingPermissionCall != null) +
+                ", pendingAction=" +
+                pendingPermissionAction
         );
         if (hasMicrophonePermission()) {
             if (pendingPermissionAction != PendingPermissionAction.NONE || pendingPermissionCall != null) {
@@ -852,9 +852,9 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         Log.d(
             TAG,
             "handleMicrophonePermissionGranted: pendingAction=" +
-            pendingPermissionAction +
-            ", pendingCall=" +
-            (pendingPermissionCall != null)
+                pendingPermissionAction +
+                ", pendingCall=" +
+                (pendingPermissionCall != null)
         );
         permissionAttemptCount = 0;
 
@@ -908,13 +908,13 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         Log.d(
             TAG,
             "handleMicrophonePermissionDenied: canRequestAgain=" +
-            canRequestAgain +
-            ", attempt=" +
-            permissionAttemptCount +
-            ", pendingAction=" +
-            pendingPermissionAction +
-            ", standaloneCall=" +
-            (pendingPermissionCall != null)
+                canRequestAgain +
+                ", attempt=" +
+                permissionAttemptCount +
+                ", pendingAction=" +
+                pendingPermissionAction +
+                ", standaloneCall=" +
+                (pendingPermissionCall != null)
         );
 
         if (pendingPermissionAction == PendingPermissionAction.NONE && pendingPermissionCall != null) {
@@ -1021,11 +1021,11 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         Log.d(
             TAG,
             "openAppSettings: awaitingSettingsResult=" +
-            awaitingSettingsResult +
-            ", pendingAction=" +
-            pendingPermissionAction +
-            ", pendingCall=" +
-            (pendingPermissionCall != null)
+                awaitingSettingsResult +
+                ", pendingAction=" +
+                pendingPermissionAction +
+                ", pendingCall=" +
+                (pendingPermissionCall != null)
         );
         Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
         intent.setData(Uri.fromParts("package", context.getPackageName(), null));
@@ -1307,11 +1307,11 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         Log.d(
             TAG,
             "requestMicrophonePermission: requestedBefore=" +
-            requestedBefore +
-            ", shouldShow=" +
-            shouldShow +
-            ", pendingAction=" +
-            pendingPermissionAction
+                requestedBefore +
+                ", shouldShow=" +
+                shouldShow +
+                ", pendingAction=" +
+                pendingPermissionAction
         );
 
         if (pendingPermissionAction == PendingPermissionAction.NONE && !shouldShow && requestedBefore) {
@@ -1349,13 +1349,13 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         Log.d(
             TAG,
             "handleRequestPermissionsResult: granted=" +
-            granted +
-            ", attempt=" +
-            permissionAttemptCount +
-            ", pendingAction=" +
-            pendingPermissionAction +
-            ", standaloneCall=" +
-            (pendingPermissionCall != null)
+                granted +
+                ", attempt=" +
+                permissionAttemptCount +
+                ", pendingAction=" +
+                pendingPermissionAction +
+                ", standaloneCall=" +
+                (pendingPermissionCall != null)
         );
         if (granted) {
             handleMicrophonePermissionGranted();

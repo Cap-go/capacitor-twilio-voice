@@ -389,12 +389,12 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
                                          to: to,
                                          isSystemInitiated: false,
                                          completion: { success in
-                if success {
-                    call.resolve(["success": true, "callSid": uuid.uuidString])
-                } else {
-                    call.reject("Failed to start call")
-                }
-            })
+                                            if success {
+                                                call.resolve(["success": true, "callSid": uuid.uuidString])
+                                            } else {
+                                                call.reject("Failed to start call")
+                                            }
+                                         })
         }
     }
 
@@ -447,11 +447,11 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
 
             NSLog("Initiating CallKit start call action for intent target: \(handleValue)")
             self.performStartCallAction(uuid: UUID(),
-                                         handle: handleValue,
-                                         to: handleValue,
-                                         isSystemInitiated: true,
-                                         displayName: displayName,
-                                         completion: { _ in })
+                                        handle: handleValue,
+                                        to: handleValue,
+                                        isSystemInitiated: true,
+                                        displayName: displayName,
+                                        completion: { _ in })
         }
     }
 
@@ -667,7 +667,7 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
         if !contact.displayName.isEmpty {
             return contact.displayName
         }
-        
+
         let displayName = contact.displayName
 
         if let nameComponents = contact.nameComponents {
@@ -836,9 +836,9 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
                 completion(false)
 
                 self?.emitOutgoingCallFailed(uuid: uuid,
-                                            to: to,
-                                            displayName: displayName,
-                                            reason: "callkit_request_failed")
+                                             to: to,
+                                             displayName: displayName,
+                                             reason: "callkit_request_failed")
                 return
             }
 
@@ -1123,9 +1123,9 @@ extension CapacitorTwilioVoicePlugin: CXProviderDelegate {
         var pendingCall = pendingOutgoingCalls[uuid]
         if pendingCall == nil {
             let fallback = PendingOutgoingCall(to: handleValue,
-                                              completion: { _ in },
-                                              isSystemInitiated: true,
-                                              displayName: nil)
+                                               completion: { _ in },
+                                               isSystemInitiated: true,
+                                               displayName: nil)
             pendingOutgoingCalls[uuid] = fallback
             pendingCall = fallback
         }
