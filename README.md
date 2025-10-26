@@ -483,3 +483,565 @@ Common error scenarios:
 | iOS      | ✅      | Requires iOS 13.0+ |
 | Android  | ✅      | Requires API level 23+ |
 | Web      | ❌      | Not supported |
+
+## API
+
+<docgen-index>
+
+* [`login(...)`](#login)
+* [`logout()`](#logout)
+* [`isLoggedIn()`](#isloggedin)
+* [`makeCall(...)`](#makecall)
+* [`acceptCall(...)`](#acceptcall)
+* [`rejectCall(...)`](#rejectcall)
+* [`endCall(...)`](#endcall)
+* [`muteCall(...)`](#mutecall)
+* [`setSpeaker(...)`](#setspeaker)
+* [`getCallStatus()`](#getcallstatus)
+* [`checkMicrophonePermission()`](#checkmicrophonepermission)
+* [`requestMicrophonePermission()`](#requestmicrophonepermission)
+* [`addListener('callInviteReceived', ...)`](#addlistenercallinvitereceived-)
+* [`addListener('callConnected', ...)`](#addlistenercallconnected-)
+* [`addListener('callInviteCancelled', ...)`](#addlistenercallinvitecancelled-)
+* [`addListener('outgoingCallInitiated', ...)`](#addlisteneroutgoingcallinitiated-)
+* [`addListener('outgoingCallFailed', ...)`](#addlisteneroutgoingcallfailed-)
+* [`addListener('callDisconnected', ...)`](#addlistenercalldisconnected-)
+* [`addListener('callRinging', ...)`](#addlistenercallringing-)
+* [`addListener('callReconnecting', ...)`](#addlistenercallreconnecting-)
+* [`addListener('callReconnected', ...)`](#addlistenercallreconnected-)
+* [`addListener('callQualityWarningsChanged', ...)`](#addlistenercallqualitywarningschanged-)
+* [`addListener('registrationSuccess', ...)`](#addlistenerregistrationsuccess-)
+* [`addListener('registrationFailure', ...)`](#addlistenerregistrationfailure-)
+* [`removeAllListeners()`](#removealllisteners)
+* [`getPluginVersion()`](#getpluginversion)
+* [Interfaces](#interfaces)
+* [Type Aliases](#type-aliases)
+
+</docgen-index>
+
+<docgen-api>
+<!--Update the source file JSDoc comments and rerun docgen to update the docs below-->
+
+Capacitor plugin for integrating Twilio Voice functionality into mobile applications.
+
+This plugin provides comprehensive voice call capabilities including:
+- User authentication with Twilio access tokens
+- Making and receiving phone calls
+- Call management (accept, reject, end, mute)
+- Audio routing controls (speaker mode)
+- Real-time call status monitoring
+- Event-driven architecture for call lifecycle events
+- Microphone permission handling
+
+### login(...)
+
+```typescript
+login(options: { accessToken: string; }) => Promise<{ success: boolean; }>
+```
+
+Authenticate the user with Twilio Voice using an access token.
+
+The access token should be generated on your backend server using your Twilio credentials.
+This token is required to make and receive calls through Twilio Voice.
+
+| Param         | Type                                  | Description            |
+| ------------- | ------------------------------------- | ---------------------- |
+| **`options`** | <code>{ accessToken: string; }</code> | - Configuration object |
+
+**Returns:** <code>Promise&lt;{ success: boolean; }&gt;</code>
+
+--------------------
+
+
+### logout()
+
+```typescript
+logout() => Promise<{ success: boolean; }>
+```
+
+Log out the current user and unregister from Twilio Voice.
+
+This will disconnect any active calls and stop the device from receiving
+new incoming call notifications.
+
+**Returns:** <code>Promise&lt;{ success: boolean; }&gt;</code>
+
+--------------------
+
+
+### isLoggedIn()
+
+```typescript
+isLoggedIn() => Promise<{ isLoggedIn: boolean; hasValidToken: boolean; identity?: string; }>
+```
+
+Check if the user is currently logged in and has a valid access token.
+
+**Returns:** <code>Promise&lt;{ isLoggedIn: boolean; hasValidToken: boolean; identity?: string; }&gt;</code>
+
+--------------------
+
+
+### makeCall(...)
+
+```typescript
+makeCall(options: { to: string; }) => Promise<{ success: boolean; callSid?: string; }>
+```
+
+Initiate an outgoing call to a phone number or client.
+
+The user must be logged in before making a call. The call will be routed
+through your Twilio backend configuration.
+
+| Param         | Type                         | Description            |
+| ------------- | ---------------------------- | ---------------------- |
+| **`options`** | <code>{ to: string; }</code> | - Configuration object |
+
+**Returns:** <code>Promise&lt;{ success: boolean; callSid?: string; }&gt;</code>
+
+--------------------
+
+
+### acceptCall(...)
+
+```typescript
+acceptCall(options: { callSid: string; }) => Promise<{ success: boolean; }>
+```
+
+Accept an incoming call.
+
+This should be called in response to a 'callInviteReceived' event.
+
+| Param         | Type                              | Description            |
+| ------------- | --------------------------------- | ---------------------- |
+| **`options`** | <code>{ callSid: string; }</code> | - Configuration object |
+
+**Returns:** <code>Promise&lt;{ success: boolean; }&gt;</code>
+
+--------------------
+
+
+### rejectCall(...)
+
+```typescript
+rejectCall(options: { callSid: string; }) => Promise<{ success: boolean; }>
+```
+
+Reject an incoming call.
+
+This should be called in response to a 'callInviteReceived' event.
+The caller will hear a busy signal or be directed to voicemail.
+
+| Param         | Type                              | Description            |
+| ------------- | --------------------------------- | ---------------------- |
+| **`options`** | <code>{ callSid: string; }</code> | - Configuration object |
+
+**Returns:** <code>Promise&lt;{ success: boolean; }&gt;</code>
+
+--------------------
+
+
+### endCall(...)
+
+```typescript
+endCall(options: { callSid?: string; }) => Promise<{ success: boolean; }>
+```
+
+End an active call.
+
+If callSid is not provided, this will end the currently active call.
+
+| Param         | Type                               | Description            |
+| ------------- | ---------------------------------- | ---------------------- |
+| **`options`** | <code>{ callSid?: string; }</code> | - Configuration object |
+
+**Returns:** <code>Promise&lt;{ success: boolean; }&gt;</code>
+
+--------------------
+
+
+### muteCall(...)
+
+```typescript
+muteCall(options: { muted: boolean; callSid?: string; }) => Promise<{ success: boolean; }>
+```
+
+Mute or unmute the microphone during an active call.
+
+When muted, the other party will not hear audio from your microphone.
+
+| Param         | Type                                               | Description            |
+| ------------- | -------------------------------------------------- | ---------------------- |
+| **`options`** | <code>{ muted: boolean; callSid?: string; }</code> | - Configuration object |
+
+**Returns:** <code>Promise&lt;{ success: boolean; }&gt;</code>
+
+--------------------
+
+
+### setSpeaker(...)
+
+```typescript
+setSpeaker(options: { enabled: boolean; }) => Promise<{ success: boolean; }>
+```
+
+Enable or disable speakerphone mode.
+
+When enabled, audio will be routed through the device's speaker instead of the earpiece.
+
+| Param         | Type                               | Description            |
+| ------------- | ---------------------------------- | ---------------------- |
+| **`options`** | <code>{ enabled: boolean; }</code> | - Configuration object |
+
+**Returns:** <code>Promise&lt;{ success: boolean; }&gt;</code>
+
+--------------------
+
+
+### getCallStatus()
+
+```typescript
+getCallStatus() => Promise<{ hasActiveCall: boolean; isOnHold: boolean; isMuted: boolean; callSid?: string; callState?: string; }>
+```
+
+Get the current status of the active call.
+
+This provides real-time information about the call state, mute status,
+hold status, and call identifiers.
+
+**Returns:** <code>Promise&lt;{ hasActiveCall: boolean; isOnHold: boolean; isMuted: boolean; callSid?: string; callState?: string; }&gt;</code>
+
+--------------------
+
+
+### checkMicrophonePermission()
+
+```typescript
+checkMicrophonePermission() => Promise<{ granted: boolean; }>
+```
+
+Check if microphone permission has been granted.
+
+This does not request permission, only checks the current permission status.
+
+**Returns:** <code>Promise&lt;{ granted: boolean; }&gt;</code>
+
+--------------------
+
+
+### requestMicrophonePermission()
+
+```typescript
+requestMicrophonePermission() => Promise<{ granted: boolean; }>
+```
+
+Request microphone permission from the user.
+
+On iOS and Android, this will show the system permission dialog if permission
+has not been granted yet. If permission was previously denied, the user may need
+to grant it in system settings.
+
+**Returns:** <code>Promise&lt;{ granted: boolean; }&gt;</code>
+
+--------------------
+
+
+### addListener('callInviteReceived', ...)
+
+```typescript
+addListener(eventName: 'callInviteReceived', listenerFunc: (data: { callSid: string; from: string; to: string; customParams: Record<string, string>; }) => void) => Promise<PluginListenerHandle>
+```
+
+Listen for incoming call invitations.
+
+This event is fired when another user or phone number is calling you.
+You should call acceptCall() or rejectCall() in response.
+
+| Param              | Type                                                                                                                                             | Description                             |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------- |
+| **`eventName`**    | <code>'callInviteReceived'</code>                                                                                                                | - The event name ('callInviteReceived') |
+| **`listenerFunc`** | <code>(data: { callSid: string; from: string; to: string; customParams: <a href="#record">Record</a>&lt;string, string&gt;; }) =&gt; void</code> | - Callback function to handle the event |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+--------------------
+
+
+### addListener('callConnected', ...)
+
+```typescript
+addListener(eventName: 'callConnected', listenerFunc: (data: { callSid: string; }) => void) => Promise<PluginListenerHandle>
+```
+
+Listen for call connected events.
+
+This event is fired when a call (incoming or outgoing) has been successfully
+connected and audio can be heard.
+
+| Param              | Type                                                 | Description                             |
+| ------------------ | ---------------------------------------------------- | --------------------------------------- |
+| **`eventName`**    | <code>'callConnected'</code>                         | - The event name ('callConnected')      |
+| **`listenerFunc`** | <code>(data: { callSid: string; }) =&gt; void</code> | - Callback function to handle the event |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+--------------------
+
+
+### addListener('callInviteCancelled', ...)
+
+```typescript
+addListener(eventName: 'callInviteCancelled', listenerFunc: (data: { callSid: string; reason: 'user_declined' | 'remote_cancelled'; }) => void) => Promise<PluginListenerHandle>
+```
+
+Listen for call invite cancellation events.
+
+This event is fired when an incoming call invitation is cancelled before being
+answered, either by the caller hanging up or by the user declining.
+
+| Param              | Type                                                                                                | Description                              |
+| ------------------ | --------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| **`eventName`**    | <code>'callInviteCancelled'</code>                                                                  | - The event name ('callInviteCancelled') |
+| **`listenerFunc`** | <code>(data: { callSid: string; reason: 'user_declined' \| 'remote_cancelled'; }) =&gt; void</code> | - Callback function to handle the event  |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+--------------------
+
+
+### addListener('outgoingCallInitiated', ...)
+
+```typescript
+addListener(eventName: 'outgoingCallInitiated', listenerFunc: (data: { callSid: string; to: string; source: 'app' | 'system'; displayName?: string; }) => void) => Promise<PluginListenerHandle>
+```
+
+Listen for outgoing call initiation events.
+
+This event is fired when an outgoing call is initiated, either from the app
+or from the system (e.g., CallKit on iOS, Telecom on Android).
+
+| Param              | Type                                                                                                              | Description                                |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| **`eventName`**    | <code>'outgoingCallInitiated'</code>                                                                              | - The event name ('outgoingCallInitiated') |
+| **`listenerFunc`** | <code>(data: { callSid: string; to: string; source: 'app' \| 'system'; displayName?: string; }) =&gt; void</code> | - Callback function to handle the event    |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+--------------------
+
+
+### addListener('outgoingCallFailed', ...)
+
+```typescript
+addListener(eventName: 'outgoingCallFailed', listenerFunc: (data: { callSid: string; to: string; reason: 'missing_access_token' | 'connection_failed' | 'no_call_details' | 'microphone_permission_denied' | 'invalid_contact' | 'callkit_request_failed' | 'unsupported_intent'; displayName?: string; }) => void) => Promise<PluginListenerHandle>
+```
+
+Listen for outgoing call failure events.
+
+This event is fired when an outgoing call fails to connect due to various reasons
+such as missing credentials, permission issues, or network problems.
+
+| Param              | Type                                                                                                                                                                                                                                                                          | Description                             |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| **`eventName`**    | <code>'outgoingCallFailed'</code>                                                                                                                                                                                                                                             | - The event name ('outgoingCallFailed') |
+| **`listenerFunc`** | <code>(data: { callSid: string; to: string; reason: 'missing_access_token' \| 'connection_failed' \| 'no_call_details' \| 'microphone_permission_denied' \| 'invalid_contact' \| 'callkit_request_failed' \| 'unsupported_intent'; displayName?: string; }) =&gt; void</code> | - Callback function to handle the event |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+--------------------
+
+
+### addListener('callDisconnected', ...)
+
+```typescript
+addListener(eventName: 'callDisconnected', listenerFunc: (data: { callSid: string; error?: string; }) => void) => Promise<PluginListenerHandle>
+```
+
+Listen for call disconnection events.
+
+This event is fired when a call ends, either normally or due to an error.
+
+| Param              | Type                                                                 | Description                             |
+| ------------------ | -------------------------------------------------------------------- | --------------------------------------- |
+| **`eventName`**    | <code>'callDisconnected'</code>                                      | - The event name ('callDisconnected')   |
+| **`listenerFunc`** | <code>(data: { callSid: string; error?: string; }) =&gt; void</code> | - Callback function to handle the event |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+--------------------
+
+
+### addListener('callRinging', ...)
+
+```typescript
+addListener(eventName: 'callRinging', listenerFunc: (data: { callSid: string; }) => void) => Promise<PluginListenerHandle>
+```
+
+Listen for call ringing events.
+
+This event is fired when an outgoing call starts ringing on the other end.
+
+| Param              | Type                                                 | Description                             |
+| ------------------ | ---------------------------------------------------- | --------------------------------------- |
+| **`eventName`**    | <code>'callRinging'</code>                           | - The event name ('callRinging')        |
+| **`listenerFunc`** | <code>(data: { callSid: string; }) =&gt; void</code> | - Callback function to handle the event |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+--------------------
+
+
+### addListener('callReconnecting', ...)
+
+```typescript
+addListener(eventName: 'callReconnecting', listenerFunc: (data: { callSid: string; error?: string; }) => void) => Promise<PluginListenerHandle>
+```
+
+Listen for call reconnecting events.
+
+This event is fired when a call loses connection and Twilio is attempting to
+reconnect. The call is not disconnected yet but audio may be interrupted.
+
+| Param              | Type                                                                 | Description                             |
+| ------------------ | -------------------------------------------------------------------- | --------------------------------------- |
+| **`eventName`**    | <code>'callReconnecting'</code>                                      | - The event name ('callReconnecting')   |
+| **`listenerFunc`** | <code>(data: { callSid: string; error?: string; }) =&gt; void</code> | - Callback function to handle the event |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+--------------------
+
+
+### addListener('callReconnected', ...)
+
+```typescript
+addListener(eventName: 'callReconnected', listenerFunc: (data: { callSid: string; }) => void) => Promise<PluginListenerHandle>
+```
+
+Listen for call reconnected events.
+
+This event is fired when a call successfully reconnects after a connection loss.
+Audio should resume normally after this event.
+
+| Param              | Type                                                 | Description                             |
+| ------------------ | ---------------------------------------------------- | --------------------------------------- |
+| **`eventName`**    | <code>'callReconnected'</code>                       | - The event name ('callReconnected')    |
+| **`listenerFunc`** | <code>(data: { callSid: string; }) =&gt; void</code> | - Callback function to handle the event |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+--------------------
+
+
+### addListener('callQualityWarningsChanged', ...)
+
+```typescript
+addListener(eventName: 'callQualityWarningsChanged', listenerFunc: (data: { callSid: string; currentWarnings: string[]; previousWarnings: string[]; }) => void) => Promise<PluginListenerHandle>
+```
+
+Listen for call quality warning events.
+
+This event is fired when the call quality changes, providing warnings about
+potential issues like high jitter, packet loss, or low audio levels.
+
+| Param              | Type                                                                                                        | Description                                     |
+| ------------------ | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| **`eventName`**    | <code>'callQualityWarningsChanged'</code>                                                                   | - The event name ('callQualityWarningsChanged') |
+| **`listenerFunc`** | <code>(data: { callSid: string; currentWarnings: string[]; previousWarnings: string[]; }) =&gt; void</code> | - Callback function to handle the event         |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+--------------------
+
+
+### addListener('registrationSuccess', ...)
+
+```typescript
+addListener(eventName: 'registrationSuccess', listenerFunc: () => void) => Promise<PluginListenerHandle>
+```
+
+Listen for successful registration events.
+
+This event is fired when the device successfully registers with Twilio Voice
+and is ready to make and receive calls. This typically occurs after a successful
+login with a valid access token.
+
+| Param              | Type                               | Description                              |
+| ------------------ | ---------------------------------- | ---------------------------------------- |
+| **`eventName`**    | <code>'registrationSuccess'</code> | - The event name ('registrationSuccess') |
+| **`listenerFunc`** | <code>() =&gt; void</code>         | - Callback function to handle the event  |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+--------------------
+
+
+### addListener('registrationFailure', ...)
+
+```typescript
+addListener(eventName: 'registrationFailure', listenerFunc: (data: { error: string; }) => void) => Promise<PluginListenerHandle>
+```
+
+Listen for registration failure events.
+
+This event is fired when the device fails to register with Twilio Voice,
+typically due to an invalid or expired access token, network issues, or
+Twilio service problems.
+
+| Param              | Type                                               | Description                              |
+| ------------------ | -------------------------------------------------- | ---------------------------------------- |
+| **`eventName`**    | <code>'registrationFailure'</code>                 | - The event name ('registrationFailure') |
+| **`listenerFunc`** | <code>(data: { error: string; }) =&gt; void</code> | - Callback function to handle the event  |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+--------------------
+
+
+### removeAllListeners()
+
+```typescript
+removeAllListeners() => Promise<void>
+```
+
+Remove all registered event listeners.
+
+This is useful for cleanup when your component unmounts or when you want to
+reset all event handling.
+
+--------------------
+
+
+### getPluginVersion()
+
+```typescript
+getPluginVersion() => Promise<{ version: string; }>
+```
+
+Get the native Capacitor plugin version
+
+**Returns:** <code>Promise&lt;{ version: string; }&gt;</code>
+
+--------------------
+
+
+### Interfaces
+
+
+#### PluginListenerHandle
+
+| Prop         | Type                                      |
+| ------------ | ----------------------------------------- |
+| **`remove`** | <code>() =&gt; Promise&lt;void&gt;</code> |
+
+
+### Type Aliases
+
+
+#### Record
+
+Construct a type with a set of properties K of type T
+
+<code>{ [P in K]: T; }</code>
+
+</docgen-api>
