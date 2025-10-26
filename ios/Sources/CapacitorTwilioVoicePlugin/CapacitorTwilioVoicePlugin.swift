@@ -4,6 +4,7 @@ import PushKit
 import CallKit
 import TwilioVoice
 import AVFoundation
+import Intents
 
 let kRegistrationTTLInDays = 365
 let kCachedDeviceToken = "CachedDeviceToken"
@@ -60,6 +61,13 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
     private var callKitCompletionCallback: ((Bool) -> Void)?
     private var playCustomRingback = false
     private var ringtonePlayer: AVAudioPlayer?
+    private struct PendingOutgoingCall {
+        let to: String
+        let completion: (Bool) -> Void
+        let isSystemInitiated: Bool
+        let displayName: String?
+    }
+    private var pendingOutgoingCalls: [UUID: PendingOutgoingCall] = [:]
 
     deinit {
         // Remove observers
@@ -93,6 +101,8 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
         let configuration = CXProviderConfiguration(localizedName: "Voice Call")
         configuration.maximumCallGroups = 2
         configuration.maximumCallsPerCallGroup = 1
+        configuration.supportedHandleTypes = [.generic, .phoneNumber]
+        configuration.includesCallsInRecents = true
         callKitProvider = CXProvider(configuration: configuration)
         if let provider = callKitProvider {
             provider.setDelegate(self, queue: nil)
@@ -374,13 +384,74 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
             }
 
             let uuid = UUID()
-            self?.performStartCallAction(uuid: uuid, handle: to, to: to) { success in
+            self?.performStartCallAction(uuid: uuid,
+                                         handle: to,
+                                         to: to,
+                                         isSystemInitiated: false,
+                                         completion: { success in
                 if success {
                     call.resolve(["success": true, "callSid": uuid.uuidString])
                 } else {
                     call.reject("Failed to start call")
                 }
+            })
+        }
+    }
+
+    @available(iOS 10.0, *)
+    public func handleStartCallIntent(intent: INIntent) {
+        if #available(iOS 13.0, *), let callIntent = intent as? INStartCallIntent {
+            processStartCallIntent(contact: callIntent.contacts?.first,
+                                   intentType: "INStartCallIntent")
+            return
+        }
+
+        if let audioIntent = intent as? INStartAudioCallIntent {
+            processStartCallIntent(contact: audioIntent.contacts?.first,
+                                   intentType: "INStartAudioCallIntent")
+            return
+        }
+
+        NSLog("Unsupported call intent type: \(type(of: intent))")
+        emitOutgoingCallFailed(to: "", displayName: nil, reason: "unsupported_intent")
+    }
+
+    @available(iOS 10.0, *)
+    private func processStartCallIntent(contact: INPerson?, intentType: String) {
+        guard let contact = contact else {
+            NSLog("\(intentType) received without contact information")
+            emitOutgoingCallFailed(to: "", displayName: nil, reason: "invalid_contact")
+            return
+        }
+
+        guard let handleValue = contact.personHandle?.value, !handleValue.isEmpty else {
+            let displayName = resolveDisplayName(from: contact)
+            NSLog("\(intentType) contact missing handle value")
+            emitOutgoingCallFailed(to: displayName ?? "", displayName: displayName, reason: "invalid_contact")
+            return
+        }
+
+        let displayName = resolveDisplayName(from: contact)
+        NSLog("Processing \(intentType) for handle: \(handleValue)")
+
+        checkRecordPermission { [weak self] permissionGranted in
+            guard let self = self else { return }
+
+            guard permissionGranted else {
+                NSLog("Microphone permission denied while processing \(intentType)")
+                self.emitOutgoingCallFailed(to: handleValue,
+                                            displayName: displayName,
+                                            reason: "microphone_permission_denied")
+                return
             }
+
+            NSLog("Initiating CallKit start call action for intent target: \(handleValue)")
+            self.performStartCallAction(uuid: UUID(),
+                                         handle: handleValue,
+                                         to: handleValue,
+                                         isSystemInitiated: true,
+                                         displayName: displayName,
+                                         completion: { _ in })
         }
     }
 
@@ -572,6 +643,44 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
         }
     }
 
+    private func emitOutgoingCallFailed(uuid: UUID = UUID(),
+                                        to: String,
+                                        displayName: String?,
+                                        reason: String) {
+        var data: [String: Any] = [
+            "callSid": uuid.uuidString,
+            "to": to,
+            "reason": reason
+        ]
+
+        if let displayName = displayName {
+            data["displayName"] = displayName
+        }
+
+        DispatchQueue.main.async { [weak self] in
+            self?.notifyListeners("outgoingCallFailed", data: data)
+        }
+    }
+
+    @available(iOS 10.0, *)
+    private func resolveDisplayName(from contact: INPerson) -> String? {
+        if !contact.displayName.isEmpty {
+            return contact.displayName
+        }
+        
+        let displayName = contact.displayName
+
+        if let nameComponents = contact.nameComponents {
+            let formatter = PersonNameComponentsFormatter()
+            let formattedName = formatter.string(from: nameComponents)
+            if !formattedName.isEmpty {
+                return formattedName
+            }
+        }
+
+        return contact.personHandle?.value
+    }
+
     private func toggleAudioRoute(toSpeaker: Bool) {
         audioDevice.block = {
             do {
@@ -700,11 +809,21 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
 
     // MARK: - CallKit Actions
 
-    private func performStartCallAction(uuid: UUID, handle: String, to: String, completion: @escaping (Bool) -> Void) {
+    private func performStartCallAction(uuid: UUID,
+                                        handle: String,
+                                        to: String,
+                                        isSystemInitiated: Bool,
+                                        displayName: String? = nil,
+                                        completion: @escaping (Bool) -> Void) {
         guard let provider = callKitProvider else {
             completion(false)
             return
         }
+
+        pendingOutgoingCalls[uuid] = PendingOutgoingCall(to: to,
+                                                         completion: completion,
+                                                         isSystemInitiated: isSystemInitiated,
+                                                         displayName: displayName)
 
         let callHandle = CXHandle(type: .generic, value: handle)
         let startCallAction = CXStartCallAction(call: uuid, handle: callHandle)
@@ -713,7 +832,13 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
         callKitCallController.request(transaction) { [weak self] error in
             if let error = error {
                 NSLog("StartCallAction transaction request failed: \(error.localizedDescription)")
+                self?.pendingOutgoingCalls.removeValue(forKey: uuid)
                 completion(false)
+
+                self?.emitOutgoingCallFailed(uuid: uuid,
+                                            to: to,
+                                            displayName: displayName,
+                                            reason: "callkit_request_failed")
                 return
             }
 
@@ -726,12 +851,10 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
             callUpdate.hasVideo = false
 
             provider.reportCall(with: uuid, updated: callUpdate)
-
-            self?.performVoiceCall(uuid: uuid, to: to, completionHandler: completion)
         }
     }
 
-    private func reportIncomingCall(from: String, uuid: UUID) {
+    private func reportIncomingCall(from: String, niceName: String, uuid: UUID) {
         guard let provider = callKitProvider else { return }
 
         let callHandle = CXHandle(type: .generic, value: from)
@@ -743,6 +866,7 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
         callUpdate.supportsGrouping = false
         callUpdate.supportsUngrouping = false
         callUpdate.hasVideo = false
+        callUpdate.localizedCallerName = niceName
 
         provider.reportNewIncomingCall(with: uuid, update: callUpdate) { error in
             if let error = error {
@@ -838,13 +962,15 @@ extension CapacitorTwilioVoicePlugin: NotificationDelegate {
         UserDefaults.standard.set(Date(), forKey: kCachedBindingDate)
 
         let from = (callInvite.from ?? "Unknown").replacingOccurrences(of: "client:", with: "")
-        reportIncomingCall(from: from, uuid: callInvite.uuid)
+        let niceName = callInvite.customParameters?["CapacitorTwilioCallerName"] ?? from
+        reportIncomingCall(from: from, niceName: niceName, uuid: callInvite.uuid)
         activeCallInvites[callInvite.uuid.uuidString] = callInvite
 
         notifyListeners("callInviteReceived", data: [
             "callSid": callInvite.uuid.uuidString,
             "from": from,
-            "to": callInvite.to ?? ""
+            "to": callInvite.to,
+            "customParams": callInvite.customParameters ?? [:]
         ])
     }
 
@@ -858,6 +984,11 @@ extension CapacitorTwilioVoicePlugin: NotificationDelegate {
         if let callInvite = callInvite {
             performEndCallAction(uuid: callInvite.uuid)
             activeCallInvites.removeValue(forKey: callInvite.uuid.uuidString)
+
+            notifyListeners("callInviteCancelled", data: [
+                "callSid": callInvite.uuid.uuidString,
+                "reason": "remote_cancelled"
+            ])
         }
     }
 }
@@ -986,7 +1117,69 @@ extension CapacitorTwilioVoicePlugin: CXProviderDelegate {
     }
 
     public func provider(_ provider: CXProvider, perform action: CXStartCallAction) {
-        provider.reportOutgoingCall(with: action.callUUID, startedConnectingAt: Date())
+        let uuid = action.callUUID
+        let handleValue = action.handle.value
+
+        var pendingCall = pendingOutgoingCalls[uuid]
+        if pendingCall == nil {
+            let fallback = PendingOutgoingCall(to: handleValue,
+                                              completion: { _ in },
+                                              isSystemInitiated: true,
+                                              displayName: nil)
+            pendingOutgoingCalls[uuid] = fallback
+            pendingCall = fallback
+        }
+
+        guard let callDetails = pendingCall else {
+            provider.reportCall(with: uuid, endedAt: Date(), reason: .failed)
+            emitOutgoingCallFailed(uuid: uuid,
+                                   to: handleValue,
+                                   displayName: nil,
+                                   reason: "no_call_details")
+            action.fail()
+            return
+        }
+
+        let to = callDetails.to
+        let source = callDetails.isSystemInitiated ? "system" : "app"
+
+        var initiatedData: [String: Any] = [
+            "callSid": uuid.uuidString,
+            "to": to,
+            "source": source
+        ]
+
+        if let displayName = callDetails.displayName {
+            initiatedData["displayName"] = displayName
+        }
+
+        notifyListeners("outgoingCallInitiated", data: initiatedData)
+
+        guard let accessToken = accessToken, isTokenValid(accessToken) else {
+            pendingOutgoingCalls.removeValue(forKey: uuid)
+            provider.reportCall(with: uuid, endedAt: Date(), reason: .failed)
+            callDetails.completion(false)
+            emitOutgoingCallFailed(uuid: uuid,
+                                   to: to,
+                                   displayName: callDetails.displayName,
+                                   reason: "missing_access_token")
+            action.fail()
+            return
+        }
+
+        provider.reportOutgoingCall(with: uuid, startedConnectingAt: Date())
+
+        performVoiceCall(uuid: uuid, to: to) { [weak self] success in
+            callDetails.completion(success)
+            if !success {
+                self?.emitOutgoingCallFailed(uuid: uuid,
+                                             to: to,
+                                             displayName: callDetails.displayName,
+                                             reason: "connection_failed")
+            }
+        }
+
+        pendingOutgoingCalls.removeValue(forKey: uuid)
         action.fulfill()
     }
 
@@ -1001,6 +1194,11 @@ extension CapacitorTwilioVoicePlugin: CXProviderDelegate {
         if let invite = activeCallInvites[action.callUUID.uuidString] {
             invite.reject()
             activeCallInvites.removeValue(forKey: action.callUUID.uuidString)
+
+            notifyListeners("callInviteCancelled", data: [
+                "callSid": action.callUUID.uuidString,
+                "reason": "user_declined"
+            ])
         } else if let call = activeCalls[action.callUUID.uuidString] {
             call.disconnect()
         }
