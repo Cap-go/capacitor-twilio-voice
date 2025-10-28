@@ -14,13 +14,33 @@ export interface CapacitorTwilioVoicePlugin {
   muteCall(options: { muted: boolean; callSid?: string }): Promise<{ success: boolean }>;
   setSpeaker(options: { enabled: boolean }): Promise<{ success: boolean }>;
 
-  // Call Status
+  /**
+   * Get the current status of calls in the plugin
+   * 
+   * @returns Promise with call status information:
+   * - hasActiveCall: Whether there is currently an active call
+   * - isOnHold: Whether the active call is on hold
+   * - isMuted: Whether the active call is muted
+   * - callSid: The unique identifier (SID) for the active call, if available
+   * - callState: Current state of the call: 'idle' (no call), 'connecting', 'ringing', 'connected', 'reconnecting', 'disconnected', or 'unknown'
+   * - pendingInvites: Number of incoming call invitations that haven't been answered or rejected yet
+   * - activeCallsCount: Total number of active calls being tracked by the system (may differ from hasActiveCall on some platforms)
+   */
   getCallStatus(): Promise<{
+    /** Whether there is currently an active call */
     hasActiveCall: boolean;
+    /** Whether the active call is on hold */
     isOnHold: boolean;
+    /** Whether the active call is muted */
     isMuted: boolean;
+    /** The unique identifier (SID) for the active call */
     callSid?: string;
+    /** Current state: 'idle', 'connecting', 'ringing', 'connected', 'reconnecting', 'disconnected', or 'unknown' */
     callState?: string;
+    /** Number of pending incoming call invitations */
+    pendingInvites: number;
+    /** Total number of active calls being tracked */
+    activeCallsCount: number;
   }>;
 
   // Audio Permissions
