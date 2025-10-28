@@ -2,6 +2,45 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.6.2](https://github.com/Cap-go/capacitor-twilio-voice/compare/7.6.1...7.6.2) (2025-10-28)
+
+
+### Bug Fixes
+
+* CI/CD config ([92eb498](https://github.com/Cap-go/capacitor-twilio-voice/commit/92eb498242c44c9523018058575339b11bfea3f5))
+* update github action ([ba8f669](https://github.com/Cap-go/capacitor-twilio-voice/commit/ba8f66915b9bedf38f90ce9a6741e1226e969811))
+
+## [7.6.1](https://github.com/Cap-go/capacitor-twilio-voice/compare/7.6.0...7.6.1) (2025-10-27)
+
+
+### Bug Fixes
+
+* renovate capacitor dep ([abe5edd](https://github.com/Cap-go/capacitor-twilio-voice/commit/abe5eddf4fd825613ff83beff775e0caf8a68027))
+
+## [7.6.0](https://github.com/Cap-go/capacitor-twilio-voice/compare/7.5.0...7.6.0) (2025-10-26)
+
+
+### Features
+
+* add comprehensive API documentation for Twilio Voice plugin ([6f01857](https://github.com/Cap-go/capacitor-twilio-voice/commit/6f01857036976d9e020010644b77e0b8d34eaa3d))
+
+## [7.5.0](https://github.com/Cap-go/capacitor-twilio-voice/compare/7.4.3...7.5.0) (2025-10-26)
+
+
+### Features
+
+* expand Twilio Voice plugin interface with additional methods and event listeners ([159a0ae](https://github.com/Cap-go/capacitor-twilio-voice/commit/159a0ae6d1ce03a62b818a10cf771e7a935020f0))
+
+## [7.4.3](https://github.com/Cap-go/capacitor-twilio-voice/compare/7.4.2...7.4.3) (2025-10-26)
+
+
+### Bug Fixes
+
+* bun ([6b737da](https://github.com/Cap-go/capacitor-twilio-voice/commit/6b737dad706e6305c1ccfcd6c5e567e14c7ddb81))
+* prevent bump for app ([a95d39a](https://github.com/Cap-go/capacitor-twilio-voice/commit/a95d39ad2bd83b4fe6828f9a03449770580f19e2))
+
+## [7.4.2](https://github.com/Cap-go/capacitor-twilio-voice/compare/7.4.1...7.4.2) (2025-10-26)
+
 ## [7.4.1](https://github.com/Cap-go/capacitor-twilio-voice/compare/7.4.0...7.4.1) (2025-10-26)
 
 
