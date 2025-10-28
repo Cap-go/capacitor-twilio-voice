@@ -49,6 +49,8 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
     isMuted: boolean;
     callSid?: string;
     callState?: string;
+    pendingInvites: number;
+    activeCallsCount: number;
   }> {
     throw this.unimplemented('Not implemented on web.');
   }
