@@ -701,7 +701,7 @@ When enabled, audio will be routed through the device's speaker instead of the e
 ### getCallStatus()
 
 ```typescript
-getCallStatus() => Promise<{ hasActiveCall: boolean; isOnHold: boolean; isMuted: boolean; callSid?: string; callState?: string; }>
+getCallStatus() => Promise<{ hasActiveCall: boolean; isOnHold: boolean; isMuted: boolean; callSid?: string; callState?: string; pendingInvites: number; activeCallsCount: number; }>
 ```
 
 Get the current status of the active call.
@@ -709,7 +709,7 @@ Get the current status of the active call.
 This provides real-time information about the call state, mute status,
 hold status, and call identifiers.
 
-**Returns:** <code>Promise&lt;{ hasActiveCall: boolean; isOnHold: boolean; isMuted: boolean; callSid?: string; callState?: string; }&gt;</code>
+**Returns:** <code>Promise&lt;{ hasActiveCall: boolean; isOnHold: boolean; isMuted: boolean; callSid?: string; callState?: string; pendingInvites: number; activeCallsCount: number; }&gt;</code>
 
 --------------------
 
