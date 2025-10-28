@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## [7.6.3](https://github.com/Cap-go/capacitor-twilio-voice/compare/7.6.2...7.6.3) (2025-10-28)
+
+
+### Bug Fixes
+
+* improve definition for getCallStatus ([4f20667](https://github.com/Cap-go/capacitor-twilio-voice/commit/4f2066776996a7c34555e274e5d5ebbfb409f8c5))
+
 ## [7.6.2](https://github.com/Cap-go/capacitor-twilio-voice/compare/7.6.1...7.6.2) (2025-10-28)
 
 
