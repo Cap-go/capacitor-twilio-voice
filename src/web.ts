@@ -1,6 +1,6 @@
 import { WebPlugin } from '@capacitor/core';
 
-import type { CapacitorTwilioVoicePlugin } from './definitions';
+import type { CapacitorTwilioVoicePlugin, CallInvite } from './definitions';
 
 export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwilioVoicePlugin {
   // Authentication
@@ -49,7 +49,7 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
     isMuted: boolean;
     callSid?: string;
     callState?: string;
-    pendingInvites: number;
+    pendingInvites: Array<CallInvite>;
     activeCallsCount: number;
   }> {
     throw this.unimplemented('Not implemented on web.');

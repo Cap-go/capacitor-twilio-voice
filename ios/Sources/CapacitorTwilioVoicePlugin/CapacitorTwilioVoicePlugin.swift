@@ -589,12 +589,28 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
             }
         }
 
+        // Build array of pending invites with same structure as callInviteReceived
+        var pendingInvitesArray: [[String: Any]] = []
+        for (callSid, callInvite) in activeCallInvites {
+            let from = (callInvite.from ?? "Unknown").replacingOccurrences(of: "client:", with: "")
+            let niceName = callInvite.customParameters?["CapacitorTwilioCallerName"] ?? from
+            
+            pendingInvitesArray.append([
+                "callSid": callSid,
+                "from": niceName,
+                "to": callInvite.to,
+                "customParams": callInvite.customParameters ?? [:]
+            ])
+        }
+
         call.resolve([
             "hasActiveCall": hasActiveCall,
             "isOnHold": isOnHold,
             "isMuted": isMuted,
             "callSid": callSid as Any,
-            "callState": callState
+            "callState": callState,
+            "pendingInvites": pendingInvitesArray,
+            "activeCallsCount": activeCalls.count
         ])
     }
 
