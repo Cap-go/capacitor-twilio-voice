@@ -307,7 +307,7 @@ export interface CapacitorTwilioVoicePlugin {
     /** Current state: 'idle', 'connecting', 'ringing', 'connected', 'reconnecting', 'disconnected', or 'unknown' */
     callState?: string;
     /** Array of pending incoming call invitations */
-    pendingInvites: Array<CallInvite>;
+    pendingInvites: CallInvite[];
     /** Total number of active calls being tracked */
     activeCallsCount: number;
   }>;
@@ -382,10 +382,7 @@ export interface CapacitorTwilioVoicePlugin {
    * await listener.remove();
    * ```
    */
-  addListener(
-    eventName: 'callInviteReceived',
-    listenerFunc: (data: CallInvite) => void,
-  ): Promise<PluginListenerHandle>;
+  addListener(eventName: 'callInviteReceived', listenerFunc: (data: CallInvite) => void): Promise<PluginListenerHandle>;
 
   /**
    * Listen for call connected events.
