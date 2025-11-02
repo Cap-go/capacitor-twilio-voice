@@ -345,11 +345,21 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
                                 () -> {
                                     Log.d(TAG, "Sending incoming call event to JavaScript: " + callSid);
 
+                                    // Strip "client:" prefix from caller name for consistency
+                                    String fromValue = callFrom;
+                                    if (fromValue != null && fromValue.startsWith("client:")) {
+                                        fromValue = fromValue.substring(7); // Remove "client:" prefix
+                                    }
+                                    String callerNameValue = callerName != null ? callerName : callFrom;
+                                    if (callerNameValue != null && callerNameValue.startsWith("client:")) {
+                                        callerNameValue = callerNameValue.substring(7); // Remove "client:" prefix
+                                    }
+
                                     JSObject data = new JSObject();
                                     data.put("callSid", callSid);
-                                    data.put("from", callFrom);
+                                    data.put("from", fromValue);
                                     data.put("to", callInvite.getTo());
-                                    data.put("callerName", callerName != null ? callerName : callFrom);
+                                    data.put("callerName", callerNameValue);
                                     data.put("openedFromNotification", true);
 
                                     notifyListeners("callInviteReceived", data);
@@ -1733,9 +1743,15 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         // Start ringtone and vibration
         startRingtone();
 
+        // Strip "client:" prefix from caller name for consistency
+        String fromValue = callerName;
+        if (fromValue != null && fromValue.startsWith("client:")) {
+            fromValue = fromValue.substring(7); // Remove "client:" prefix
+        }
+
         JSObject data = new JSObject();
         data.put("callSid", callSid);
-        data.put("from", callerName);
+        data.put("from", fromValue);
         data.put("to", callInvite.getTo());
         data.put("customParams", new JSONObject(params));
         notifyListeners("callInviteReceived", data);
