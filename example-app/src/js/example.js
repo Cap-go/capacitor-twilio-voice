@@ -504,6 +504,30 @@ class TwilioVoiceApp {
     
     // Show the incoming call screen
     this.showIncomingCallScreen(data.callerName || data.from);
+
+    // TEST: Check call status 1 second after receiving invite to verify pendingInvites array
+    setTimeout(async () => {
+      try {
+        const status = await CapacitorTwilioVoice.getCallStatus();
+        console.log('=== PENDING INVITES TEST ===');
+        console.log('Full call status:', status);
+        console.log('Number of pending invites:', status.pendingInvites.length);
+        console.log('Pending invites array:', status.pendingInvites);
+        if (status.pendingInvites.length > 0) {
+          status.pendingInvites.forEach((invite, index) => {
+            console.log(`Pending invite ${index + 1}:`, {
+              callSid: invite.callSid,
+              from: invite.from,
+              to: invite.to,
+              customParams: invite.customParams
+            });
+          });
+        }
+        console.log('=== END TEST ===');
+      } catch (error) {
+        console.error('Error testing getCallStatus:', error);
+      }
+    }, 1000);
   }
 
   handleOutgoingCallInitiated(data) {

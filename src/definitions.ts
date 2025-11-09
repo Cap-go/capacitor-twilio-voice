@@ -26,6 +26,40 @@
  * });
  * ```
  */
+
+/**
+ * Represents a pending incoming call invitation.
+ *
+ * This interface describes the data structure for call invitations that have been received
+ * but not yet accepted or rejected. The same structure is used both in the
+ * `callInviteReceived` event and in the `pendingInvites` array returned by `getCallStatus()`.
+ *
+ * @example
+ * ```typescript
+ * CapacitorTwilioVoice.addListener('callInviteReceived', (data: CallInvite) => {
+ *   console.log('Incoming call from:', data.from);
+ *   console.log('Call SID:', data.callSid);
+ *   console.log('To:', data.to);
+ *   console.log('Custom params:', data.customParams);
+ * });
+ *
+ * const status = await CapacitorTwilioVoice.getCallStatus();
+ * status.pendingInvites.forEach((invite: CallInvite) => {
+ *   console.log('Pending call from:', invite.from);
+ * });
+ * ```
+ */
+export interface CallInvite {
+  /** Unique identifier for the incoming call invitation */
+  callSid: string;
+  /** Phone number or client identifier of the caller (may include custom caller name) */
+  from: string;
+  /** Phone number or client identifier being called */
+  to: string;
+  /** Custom parameters passed with the call invitation */
+  customParams: Record<string, string>;
+}
+
 export interface CapacitorTwilioVoicePlugin {
   // Authentication
 
@@ -247,7 +281,7 @@ export interface CapacitorTwilioVoicePlugin {
    * @returns isMuted - Whether the microphone is muted
    * @returns callSid - Unique identifier of the active call (if any)
    * @returns callState - Current state of the call (e.g., 'connecting', 'connected', 'ringing')
-   * @returns pendingInvites - Number of pending incoming call invitations
+   * @returns pendingInvites - Array of pending incoming call invitations with the same data as callInviteReceived
    * @returns activeCallsCount - Total number of active calls being tracked
    *
    * @example
@@ -272,8 +306,8 @@ export interface CapacitorTwilioVoicePlugin {
     callSid?: string;
     /** Current state: 'idle', 'connecting', 'ringing', 'connected', 'reconnecting', 'disconnected', or 'unknown' */
     callState?: string;
-    /** Number of pending incoming call invitations */
-    pendingInvites: number;
+    /** Array of pending incoming call invitations */
+    pendingInvites: CallInvite[];
     /** Total number of active calls being tracked */
     activeCallsCount: number;
   }>;
@@ -330,11 +364,7 @@ export interface CapacitorTwilioVoicePlugin {
    *
    * @param eventName - The event name ('callInviteReceived')
    * @param listenerFunc - Callback function to handle the event
-   * @param listenerFunc.data - Event data
-   * @param listenerFunc.data.callSid - Unique identifier for the incoming call
-   * @param listenerFunc.data.from - Phone number or client identifier of the caller
-   * @param listenerFunc.data.to - Phone number or client identifier being called
-   * @param listenerFunc.data.customParams - Custom parameters passed with the call
+   * @param listenerFunc.data - Event data of type {@link CallInvite}
    * @returns Promise that resolves with a listener handle for removing the listener
    *
    * @example
@@ -352,10 +382,7 @@ export interface CapacitorTwilioVoicePlugin {
    * await listener.remove();
    * ```
    */
-  addListener(
-    eventName: 'callInviteReceived',
-    listenerFunc: (data: { callSid: string; from: string; to: string; customParams: Record<string, string> }) => void,
-  ): Promise<PluginListenerHandle>;
+  addListener(eventName: 'callInviteReceived', listenerFunc: (data: CallInvite) => void): Promise<PluginListenerHandle>;
 
   /**
    * Listen for call connected events.

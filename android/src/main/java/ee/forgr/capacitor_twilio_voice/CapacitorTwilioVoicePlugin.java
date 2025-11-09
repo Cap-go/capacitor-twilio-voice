@@ -345,11 +345,21 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
                                 () -> {
                                     Log.d(TAG, "Sending incoming call event to JavaScript: " + callSid);
 
+                                    // Strip "client:" prefix from caller name for consistency
+                                    String fromValue = callFrom;
+                                    if (fromValue != null && fromValue.startsWith("client:")) {
+                                        fromValue = fromValue.substring(7); // Remove "client:" prefix
+                                    }
+                                    String callerNameValue = callerName != null ? callerName : callFrom;
+                                    if (callerNameValue != null && callerNameValue.startsWith("client:")) {
+                                        callerNameValue = callerNameValue.substring(7); // Remove "client:" prefix
+                                    }
+
                                     JSObject data = new JSObject();
                                     data.put("callSid", callSid);
-                                    data.put("from", callFrom);
+                                    data.put("from", fromValue);
                                     data.put("to", callInvite.getTo());
-                                    data.put("callerName", callerName != null ? callerName : callFrom);
+                                    data.put("callerName", callerNameValue);
                                     data.put("openedFromNotification", true);
 
                                     notifyListeners("callInviteReceived", data);
@@ -1268,7 +1278,31 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             ret.put("hasActiveCall", false);
         }
 
-        ret.put("pendingInvites", activeCallInvites.size());
+        // Build array of pending invites with same structure as callInviteReceived
+        JSArray pendingInvitesArray = new JSArray();
+        for (Map.Entry<String, CallInvite> entry : activeCallInvites.entrySet()) {
+            String callSid = entry.getKey();
+            CallInvite callInvite = entry.getValue();
+
+            Map<String, String> params = callInvite.getCustomParameters();
+            String callerName = params.containsKey("CapacitorTwilioCallerName")
+                ? params.get("CapacitorTwilioCallerName")
+                : callInvite.getFrom();
+
+            // Strip "client:" prefix from caller name for consistency
+            if (callerName != null && callerName.startsWith("client:")) {
+                callerName = callerName.substring(7); // Remove "client:" prefix
+            }
+
+            JSObject inviteData = new JSObject();
+            inviteData.put("callSid", callSid);
+            inviteData.put("from", callerName);
+            inviteData.put("to", callInvite.getTo());
+            inviteData.put("customParams", new JSONObject(params));
+
+            pendingInvitesArray.put(inviteData);
+        }
+        ret.put("pendingInvites", pendingInvitesArray);
         ret.put("activeCallsCount", activeCalls.size() + callsByUuid.size());
         call.resolve(ret);
     }
@@ -1709,9 +1743,15 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         // Start ringtone and vibration
         startRingtone();
 
+        // Strip "client:" prefix from caller name for consistency
+        String fromValue = callerName;
+        if (fromValue != null && fromValue.startsWith("client:")) {
+            fromValue = fromValue.substring(7); // Remove "client:" prefix
+        }
+
         JSObject data = new JSObject();
         data.put("callSid", callSid);
-        data.put("from", callerName);
+        data.put("from", fromValue);
         data.put("to", callInvite.getTo());
         data.put("customParams", new JSONObject(params));
         notifyListeners("callInviteReceived", data);
