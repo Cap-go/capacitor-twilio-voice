@@ -522,17 +522,6 @@ Common error scenarios:
 <docgen-api>
 <!--Update the source file JSDoc comments and rerun docgen to update the docs below-->
 
-Capacitor plugin for integrating Twilio Voice functionality into mobile applications.
-
-This plugin provides comprehensive voice call capabilities including:
-- User authentication with Twilio access tokens
-- Making and receiving phone calls
-- Call management (accept, reject, end, mute)
-- Audio routing controls (speaker mode)
-- Real-time call status monitoring
-- Event-driven architecture for call lifecycle events
-- Microphone permission handling
-
 ### login(...)
 
 ```typescript
@@ -701,7 +690,7 @@ When enabled, audio will be routed through the device's speaker instead of the e
 ### getCallStatus()
 
 ```typescript
-getCallStatus() => Promise<{ hasActiveCall: boolean; isOnHold: boolean; isMuted: boolean; callSid?: string; callState?: string; pendingInvites: number; activeCallsCount: number; }>
+getCallStatus() => Promise<{ hasActiveCall: boolean; isOnHold: boolean; isMuted: boolean; callSid?: string; callState?: string; pendingInvites: CallInvite[]; activeCallsCount: number; }>
 ```
 
 Get the current status of the active call.
@@ -709,7 +698,7 @@ Get the current status of the active call.
 This provides real-time information about the call state, mute status,
 hold status, and call identifiers.
 
-**Returns:** <code>Promise&lt;{ hasActiveCall: boolean; isOnHold: boolean; isMuted: boolean; callSid?: string; callState?: string; pendingInvites: number; activeCallsCount: number; }&gt;</code>
+**Returns:** <code>Promise&lt;{ hasActiveCall: boolean; isOnHold: boolean; isMuted: boolean; callSid?: string; callState?: string; pendingInvites: CallInvite[]; activeCallsCount: number; }&gt;</code>
 
 --------------------
 
@@ -749,7 +738,7 @@ to grant it in system settings.
 ### addListener('callInviteReceived', ...)
 
 ```typescript
-addListener(eventName: 'callInviteReceived', listenerFunc: (data: { callSid: string; from: string; to: string; customParams: Record<string, string>; }) => void) => Promise<PluginListenerHandle>
+addListener(eventName: 'callInviteReceived', listenerFunc: (data: CallInvite) => void) => Promise<PluginListenerHandle>
 ```
 
 Listen for incoming call invitations.
@@ -757,10 +746,10 @@ Listen for incoming call invitations.
 This event is fired when another user or phone number is calling you.
 You should call acceptCall() or rejectCall() in response.
 
-| Param              | Type                                                                                                                                             | Description                             |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------- |
-| **`eventName`**    | <code>'callInviteReceived'</code>                                                                                                                | - The event name ('callInviteReceived') |
-| **`listenerFunc`** | <code>(data: { callSid: string; from: string; to: string; customParams: <a href="#record">Record</a>&lt;string, string&gt;; }) =&gt; void</code> | - Callback function to handle the event |
+| Param              | Type                                                                 | Description                             |
+| ------------------ | -------------------------------------------------------------------- | --------------------------------------- |
+| **`eventName`**    | <code>'callInviteReceived'</code>                                    | - The event name ('callInviteReceived') |
+| **`listenerFunc`** | <code>(data: <a href="#callinvite">CallInvite</a>) =&gt; void</code> | - Callback function to handle the event |
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
@@ -1026,6 +1015,22 @@ Get the native Capacitor plugin version
 
 
 ### Interfaces
+
+
+#### CallInvite
+
+Represents a pending incoming call invitation.
+
+This interface describes the data structure for call invitations that have been received
+but not yet accepted or rejected. The same structure is used both in the
+`callInviteReceived` event and in the `pendingInvites` array returned by `getCallStatus()`.
+
+| Prop               | Type                                                            | Description                                                                      |
+| ------------------ | --------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| **`callSid`**      | <code>string</code>                                             | Unique identifier for the incoming call invitation                               |
+| **`from`**         | <code>string</code>                                             | Phone number or client identifier of the caller (may include custom caller name) |
+| **`to`**           | <code>string</code>                                             | Phone number or client identifier being called                                   |
+| **`customParams`** | <code><a href="#record">Record</a>&lt;string, string&gt;</code> | Custom parameters passed with the call invitation                                |
 
 
 #### PluginListenerHandle
