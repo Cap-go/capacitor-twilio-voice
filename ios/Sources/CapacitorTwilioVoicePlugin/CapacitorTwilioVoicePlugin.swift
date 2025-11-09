@@ -594,7 +594,7 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
         for (callSid, callInvite) in activeCallInvites {
             let from = (callInvite.from ?? "Unknown").replacingOccurrences(of: "client:", with: "")
             let niceName = callInvite.customParameters?["CapacitorTwilioCallerName"] ?? from
-            
+
             pendingInvitesArray.append([
                 "callSid": callSid,
                 "from": niceName,
