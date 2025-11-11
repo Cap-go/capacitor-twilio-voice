@@ -64,7 +64,7 @@ import Capacitor
 +         initializePushKit()
 +         
 +         guard let viewController = UIApplication.shared.windows.first?.rootViewController as? CustomCapacitorViewController else {
-+             fatalError("Root view controlelr is not Capacitor view controller")
++             fatalError("Root view controller is not Capacitor view controller")
 +         }
 +         
 +         viewController.passPushKitEventDelegate = { delegate in
