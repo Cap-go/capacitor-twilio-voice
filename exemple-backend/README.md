@@ -50,7 +50,7 @@ Visit [http://localhost:4567](http://localhost:4567) to ensure the server is run
 
 ### Up and running
 
-This web application needs to be accessbile on the public internet in order to receive webhook requests from Twilio. [Ngrok](https://ngrok.com/) is a great options for getting this done quickly.
+This web application needs to be accessible on the public internet in order to receive webhook requests from Twilio. [Ngrok](https://ngrok.com/) is a great options for getting this done quickly.
 
 Once you have the application running locally, in a separate terminal window, make your server available to the public internet with the following:
 

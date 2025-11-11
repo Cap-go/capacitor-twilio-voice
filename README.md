@@ -151,7 +151,7 @@ Change the view controller to `CustomCapacitorViewController` in `Main.storyboar
     </dependencies>
     <scenes>
         <!--Bridge View Controller-->
-        <scene sceneID="tne-QT-ifu">
+        <scene sceneID="the-QT-ifu">
             <objects>
 -                <viewController id="BYZ-38-t0r" customClass="CAPBridgeViewController" customModule="Capacitor" sceneMemberID="viewController"/>
 +                <viewController id="BYZ-38-t0r" customClass="CustomCapacitorViewController" customModule="App" customModuleProvider="target" sceneMemberID="viewController"/>
