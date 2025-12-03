@@ -312,6 +312,54 @@ Keep in mind, this will make it so that you app can be accessed when the screen 
  - [iOS Setup](https://www.twilio.com/docs/voice/sdks/ios/get-started)
  - [Android Setup](https://www.twilio.com/docs/voice/sdks/android/get-started)
 
+## Caller Name Display (CapacitorTwilioCallerName)
+
+By default, incoming calls display the caller's phone number or client ID. You can customize this by passing a `CapacitorTwilioCallerName` parameter from your TwiML backend to display a friendly name instead.
+
+### Backend Setup
+
+When generating your TwiML response for the `<Client>` dial, add the `CapacitorTwilioCallerName` parameter:
+
+```java
+// Java example (see exemple-backend for full implementation)
+Parameter callerNameParam = new Parameter.Builder()
+    .name("CapacitorTwilioCallerName")
+    .value("John Doe")
+    .build();
+
+Client client = new Client.Builder(identity)
+    .parameter(callerNameParam)
+    .build();
+
+Dial dial = new Dial.Builder()
+    .client(client)
+    .build();
+```
+
+```javascript
+// Node.js example
+const VoiceResponse = require('twilio').twiml.VoiceResponse;
+
+const response = new VoiceResponse();
+const dial = response.dial();
+dial.client({
+  name: 'CapacitorTwilioCallerName',
+  value: 'John Doe'
+}, identity);
+```
+
+### How It Works
+
+1. When your backend receives an incoming call, it generates TwiML to route the call
+2. Include the `CapacitorTwilioCallerName` parameter with the caller's display name
+3. The plugin automatically extracts this parameter and uses it for:
+   - iOS CallKit incoming call screen
+   - Android incoming call notification
+   - The `from` field in `callInviteReceived` events
+   - The `pendingInvites` array in `getCallStatus()`
+
+If `CapacitorTwilioCallerName` is not provided, the plugin falls back to the caller's phone number or client ID.
+
 ## Usage
 
 ### Authentication
