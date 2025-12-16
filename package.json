@@ -24,6 +24,7 @@
   "bugs": {
     "url": "https://github.com/Cap-go/capacitor-twilio-voice/issues"
   },
+  "homepage": "https://capgo.app/docs/plugins/twilio-voice/",
   "keywords": [
     "capacitor",
     "plugin",
