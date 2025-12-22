@@ -51,7 +51,7 @@ repositories {
 dependencies {
     implementation 'com.twilio:voice-android:6.9.+'
     implementation 'com.twilio:audioswitch:1.2.2'
-    implementation 'com.google.firebase:firebase-messaging:25.0.0'
+    implementation 'com.google.firebase:firebase-messaging:25.0.1'
     implementation 'androidx.lifecycle:lifecycle-extensions:2.2.0'
     implementation platform('com.google.firebase:firebase-bom:34.0.0')
     implementation 'androidx.core:core:1.13.1'
