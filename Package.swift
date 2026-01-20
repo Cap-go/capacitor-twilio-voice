@@ -10,7 +10,7 @@ let package = Package(
             targets: ["CapacitorTwilioVoicePlugin"])
     ],
     dependencies: [
-        .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", from: "8.0.0"),
+        .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", from: "8.0.1"),
         .package(url: "https://github.com/twilio/twilio-voice-ios", from: "6.13.5")
     ],
     targets: [
