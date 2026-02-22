@@ -1223,6 +1223,36 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
     }
 
     @PluginMethod
+    public void sendDigits(PluginCall call) {
+        String digits = call.getString("digits");
+        if (digits == null) {
+            call.reject("digits parameter is required");
+            return;
+        }
+
+        String callSid = call.getString("callSid");
+        Call targetCall = null;
+
+        if (callSid != null) {
+            if (activeCalls.containsKey(callSid)) {
+                targetCall = activeCalls.get(callSid);
+            }
+        } else {
+            targetCall = activeCall;
+        }
+
+        if (targetCall == null) {
+            call.reject("No active call found");
+            return;
+        }
+
+        targetCall.sendDigits(digits);
+        JSObject ret = new JSObject();
+        ret.put("success", true);
+        call.resolve(ret);
+    }
+
+    @PluginMethod
     public void muteCall(PluginCall call) {
         boolean muted = call.getBoolean("muted", false);
 

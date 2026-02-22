@@ -40,6 +40,7 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
         CAPPluginMethod(name: "rejectCall", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "endCall", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "muteCall", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "sendDigits", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setSpeaker", returnType: CAPPluginReturnPromise),
 
         CAPPluginMethod(name: "getCallStatus", returnType: CAPPluginReturnPromise),
@@ -551,6 +552,30 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
         }
 
         activeCall.isMuted = muted
+        call.resolve(["success": true])
+    }
+
+    @objc func sendDigits(_ call: CAPPluginCall) {
+        guard let digits = call.getString("digits") else {
+            call.reject("digits parameter is required")
+            return
+        }
+
+        let callSid = call.getString("callSid")
+        var targetCall: Call?
+
+        if let callSid = callSid {
+            targetCall = activeCalls[callSid]
+        } else {
+            targetCall = getActiveCall()
+        }
+
+        guard let activeCall = targetCall else {
+            call.reject("No active call found")
+            return
+        }
+
+        activeCall.sendDigits(digits)
         call.resolve(["success": true])
     }
 
@@ -1130,6 +1155,16 @@ extension CapacitorTwilioVoicePlugin: CXProviderDelegate {
 
     public func provider(_ provider: CXProvider, didDeactivate audioSession: AVAudioSession) {
         audioDevice.isEnabled = false
+    }
+
+    public func provider(_ provider: CXProvider, perform action: CXPlayDTMFCallAction) {
+        guard let call = activeCalls[action.callUUID.uuidString] else {
+            action.fail()
+            return
+        }
+
+        call.sendDigits(action.digits)
+        action.fulfill()
     }
 
     public func provider(_ provider: CXProvider, perform action: CXStartCallAction) {
