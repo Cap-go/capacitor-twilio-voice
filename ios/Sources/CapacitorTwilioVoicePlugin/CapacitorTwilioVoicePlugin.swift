@@ -40,12 +40,16 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
         CAPPluginMethod(name: "rejectCall", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "endCall", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "muteCall", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "sendDigits", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setSpeaker", returnType: CAPPluginReturnPromise),
 
         CAPPluginMethod(name: "getCallStatus", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "checkMicrophonePermission", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "requestMicrophonePermission", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "getPluginVersion", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "getPluginVersion", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getAudioDevices", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setInputDevice", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setOutputDevice", returnType: CAPPluginReturnPromise)
     ]
 
     // MARK: - Properties
@@ -551,6 +555,30 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
         }
 
         activeCall.isMuted = muted
+        call.resolve(["success": true])
+    }
+
+    @objc func sendDigits(_ call: CAPPluginCall) {
+        guard let digits = call.getString("digits") else {
+            call.reject("digits parameter is required")
+            return
+        }
+
+        let callSid = call.getString("callSid")
+        var targetCall: Call?
+
+        if let callSid = callSid {
+            targetCall = activeCalls[callSid]
+        } else {
+            targetCall = getActiveCall()
+        }
+
+        guard let activeCall = targetCall else {
+            call.reject("No active call found")
+            return
+        }
+
+        activeCall.sendDigits(digits)
         call.resolve(["success": true])
     }
 
@@ -1132,6 +1160,16 @@ extension CapacitorTwilioVoicePlugin: CXProviderDelegate {
         audioDevice.isEnabled = false
     }
 
+    public func provider(_ provider: CXProvider, perform action: CXPlayDTMFCallAction) {
+        guard let call = activeCalls[action.callUUID.uuidString] else {
+            action.fail()
+            return
+        }
+
+        call.sendDigits(action.digits)
+        action.fulfill()
+    }
+
     public func provider(_ provider: CXProvider, perform action: CXStartCallAction) {
         let uuid = action.callUUID
         let handleValue = action.handle.value
@@ -1263,6 +1301,24 @@ extension CapacitorTwilioVoicePlugin: AVAudioPlayerDelegate {
 
     @objc func getPluginVersion(_ call: CAPPluginCall) {
         call.resolve(["version": self.pluginVersion])
+    }
+
+    // MARK: - Audio Device Selection (Web-only, stubs for native)
+
+    @objc func getAudioDevices(_ call: CAPPluginCall) {
+        // Audio device selection is only supported on web platform.
+        // On iOS, the system manages audio routing automatically.
+        call.resolve(["devices": []])
+    }
+
+    @objc func setInputDevice(_ call: CAPPluginCall) {
+        // Audio device selection is only supported on web platform.
+        call.resolve(["success": true])
+    }
+
+    @objc func setOutputDevice(_ call: CAPPluginCall) {
+        // Audio device selection is only supported on web platform.
+        call.resolve(["success": true])
     }
 
 }

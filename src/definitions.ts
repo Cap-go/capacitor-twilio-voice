@@ -9,6 +9,7 @@
  * - Real-time call status monitoring
  * - Event-driven architecture for call lifecycle events
  * - Microphone permission handling
+ * - Audio device selection (web/Electron only)
  *
  * @example
  * ```typescript
@@ -58,6 +59,35 @@ export interface CallInvite {
   to: string;
   /** Custom parameters passed with the call invitation */
   customParams: Record<string, string>;
+}
+
+/**
+ * Represents an audio device (microphone or speaker) available for use.
+ *
+ * This interface is used by the web implementation to enumerate and select
+ * specific audio input/output devices. On iOS and Android, audio routing is
+ * handled by the OS (earpiece/speaker toggle, Bluetooth).
+ *
+ * @example
+ * ```typescript
+ * const { inputs, outputs } = await CapacitorTwilioVoice.getAudioDevices();
+ * console.log('Microphones:', inputs.map(d => d.label));
+ * console.log('Speakers:', outputs.map(d => d.label));
+ *
+ * // Select a specific microphone
+ * await CapacitorTwilioVoice.setInputDevice({ deviceId: inputs[1].deviceId });
+ *
+ * // Select a specific speaker
+ * await CapacitorTwilioVoice.setOutputDevice({ deviceId: outputs[1].deviceId });
+ * ```
+ */
+export interface AudioDevice {
+  /** Browser-assigned unique identifier for this device */
+  deviceId: string;
+  /** Human-readable label (e.g., "Built-in Microphone", "AirPods Pro") */
+  label: string;
+  /** Whether this is an input (microphone) or output (speaker) device */
+  kind: 'audioinput' | 'audiooutput';
 }
 
 export interface CapacitorTwilioVoicePlugin {
@@ -147,7 +177,7 @@ export interface CapacitorTwilioVoicePlugin {
    * });
    * ```
    */
-  makeCall(options: { to: string }): Promise<{ success: boolean; callSid?: string }>;
+  makeCall(options: { to: string; params?: Record<string, string> }): Promise<{ success: boolean; callSid?: string }>;
 
   /**
    * Accept an incoming call.
@@ -242,6 +272,29 @@ export interface CapacitorTwilioVoicePlugin {
    * ```
    */
   muteCall(options: { muted: boolean; callSid?: string }): Promise<{ success: boolean }>;
+
+  /**
+   * Send DTMF digits during an active call.
+   *
+   * @param options - Configuration object
+   * @param options.digits - The digit string to send. Valid characters are 0-9, *, #, and w (for 0.5s pause).
+   * @param options.callSid - Unique identifier of the call (optional, defaults to current active call)
+   * @returns Promise that resolves with success status
+   *
+   * @example
+   * ```typescript
+   * // Send digits "1234"
+   * await CapacitorTwilioVoice.sendDigits({
+   *   digits: '1234'
+   * });
+   *
+   * // Send digits with pauses "1w2w3"
+   * await CapacitorTwilioVoice.sendDigits({
+   *   digits: '1w2w3'
+   * });
+   * ```
+   */
+  sendDigits(options: { digits: string; callSid?: string }): Promise<{ success: boolean }>;
 
   /**
    * Enable or disable speakerphone mode.
@@ -353,6 +406,70 @@ export interface CapacitorTwilioVoicePlugin {
    * ```
    */
   requestMicrophonePermission(): Promise<{ granted: boolean }>;
+
+  // Audio Device Selection (web/Electron only, stubs on native)
+
+  /**
+   * Get available audio input and output devices.
+   *
+   * On web/Electron: Enumerates system audio devices using the Web Audio API.
+   * Requires microphone permission to have been granted for device labels to be available.
+   * On iOS/Android: Returns empty arrays (audio routing is handled by the OS).
+   *
+   * @returns Promise with arrays of input (microphone) and output (speaker) AudioDevice objects
+   *
+   * @example
+   * ```typescript
+   * const { inputs, outputs } = await CapacitorTwilioVoice.getAudioDevices();
+   * console.log('Available microphones:', inputs);
+   * console.log('Available speakers:', outputs);
+   * ```
+   */
+  getAudioDevices(): Promise<{ inputs: AudioDevice[]; outputs: AudioDevice[] }>;
+
+  /**
+   * Select a specific audio input device (microphone).
+   *
+   * On web/Electron: Routes microphone input through the specified device.
+   * The device stays active until another input is selected, the call ends,
+   * or `logout()` is called.
+   * On iOS/Android: No-op, returns `{ success: true }`.
+   *
+   * @param options - Configuration object
+   * @param options.deviceId - The deviceId of the desired input device (from `getAudioDevices()`)
+   * @returns Promise that resolves with success status
+   *
+   * @example
+   * ```typescript
+   * const { inputs } = await CapacitorTwilioVoice.getAudioDevices();
+   * if (inputs.length > 1) {
+   *   await CapacitorTwilioVoice.setInputDevice({ deviceId: inputs[1].deviceId });
+   * }
+   * ```
+   */
+  setInputDevice(options: { deviceId: string }): Promise<{ success: boolean }>;
+
+  /**
+   * Select a specific audio output device (speaker/headphones).
+   *
+   * On web/Electron: Routes call audio and ringtone through the specified device.
+   * Requires browser support for the `setSinkId` API. Check `getAudioDevices()` for
+   * available outputs — if the array is empty, output selection is not supported.
+   * On iOS/Android: No-op, returns `{ success: true }`.
+   *
+   * @param options - Configuration object
+   * @param options.deviceId - The deviceId of the desired output device (from `getAudioDevices()`)
+   * @returns Promise that resolves with success status
+   *
+   * @example
+   * ```typescript
+   * const { outputs } = await CapacitorTwilioVoice.getAudioDevices();
+   * if (outputs.length > 1) {
+   *   await CapacitorTwilioVoice.setOutputDevice({ deviceId: outputs[1].deviceId });
+   * }
+   * ```
+   */
+  setOutputDevice(options: { deviceId: string }): Promise<{ success: boolean }>;
 
   // Listeners for events
 
@@ -702,6 +819,35 @@ export interface CapacitorTwilioVoicePlugin {
   addListener(
     eventName: 'registrationFailure',
     listenerFunc: (data: { error: string }) => void,
+  ): Promise<PluginListenerHandle>;
+
+  /**
+   * Listen for audio device changes.
+   *
+   * This event is fired when audio input/output devices are added or removed
+   * from the system (e.g., plugging in headphones, connecting Bluetooth).
+   * Web/Electron only — this event is never fired on iOS/Android.
+   *
+   * @param eventName - The event name ('audioDevicesChanged')
+   * @param listenerFunc - Callback function to handle the event
+   * @param listenerFunc.data - Event data with updated device lists
+   * @param listenerFunc.data.inputs - Updated array of available input (microphone) devices
+   * @param listenerFunc.data.outputs - Updated array of available output (speaker) devices
+   * @returns Promise that resolves with a listener handle for removing the listener
+   *
+   * @example
+   * ```typescript
+   * await CapacitorTwilioVoice.addListener('audioDevicesChanged', (data) => {
+   *   console.log('Audio devices changed');
+   *   console.log('Microphones:', data.inputs.map(d => d.label));
+   *   console.log('Speakers:', data.outputs.map(d => d.label));
+   *   // Update device selection UI
+   * });
+   * ```
+   */
+  addListener(
+    eventName: 'audioDevicesChanged',
+    listenerFunc: (data: { inputs: AudioDevice[]; outputs: AudioDevice[] }) => void,
   ): Promise<PluginListenerHandle>;
 
   /**

@@ -1,4 +1,5 @@
 ## Capacitor Twilio Voice Plugin
+
  <a href="https://capgo.app/"><img src='https://raw.githubusercontent.com/Cap-go/capgo/main/assets/capgo_banner.png' alt='Capgo - Instant updates for capacitor'/></a>
 
 <div align="center">
@@ -10,7 +11,7 @@ A Capacitor plugin for integrating Twilio Voice calling functionality into iOS a
 
 ## Documentation
 
-The most complete doc is available here: https://capgo.app/docs/plugins/twilio-voice/
+The most complete doc is available here: <https://capgo.app/docs/plugins/twilio-voice/>
 
 ## Compatibility
 
@@ -43,7 +44,7 @@ npx cap sync
 
 Copy the code from `example-app/ios/App/App/CustomCapacitorViewController.swift` to your `ios/App/App/CustomCapacitorViewController.swift` file.
 
-3. Modify `AppDelegate.swift`
+1. Modify `AppDelegate.swift`
 
 Add the following to `AppDelegate.swift`:
 
@@ -175,7 +176,6 @@ Change the view controller to `CustomCapacitorViewController` in `Main.storyboar
 
 Look in the example app for more details.
 
-
 ### 4. Setup `Info.plist`
 
 Add the following to `ios/App/App/Info.plist`:
@@ -191,43 +191,45 @@ Add the following to `ios/App/App/Info.plist`:
 </array>
 ```
 
-5. Make sure you have the following capabilities enabled in Xcode:
+1. Make sure you have the following capabilities enabled in Xcode:
 
 - Push Notifications
 - Background Modes
 
-6. Generate the certificate for Push Notifications
+1. Generate the certificate for Push Notifications
 
 In order to generate the certificate for Push Notifications, you need to follow these steps:
 
 1. Generate the signing certificate for your app.
+
 ```bash
 openssl genrsa -out ALDsigning.key 2048
 ```
 
-2. Generate the signing request.
+1. Generate the signing request.
+
 ```bash
 openssl req -new -key ALDsigning.key -out csr3072ALDSigning.certSigningRequest -subj "/emailAddress=example@example.com, CN=Example Name, C=IE"
 ```
 
 Then, please upload it to your Apple Developer account [here](https://developer.apple.com/account/resources/certificates/add). Search for `Create a new VoIP Services Certificate`
 
-3. Download the file provided by Apple.
+1. Download the file provided by Apple.
 
-4. Extract the .p12 file from the downloaded file.
+2. Extract the .p12 file from the downloaded file.
 
 ```bash
 openssl pkcs12 -export -out voip_services.p12 -inkey ALDsigning.key -in voip_services.cer
 ```
 
-5. Export the `cert.pem` and `key.pem` files from the .p12 file.
+1. Export the `cert.pem` and `key.pem` files from the .p12 file.
 
 ```bash
 openssl pkcs12 -in voip_services.p12 -nokeys -out cert.pem -nodes
 openssl pkcs12 -in voip_services.p12 -nocerts -out key.pem -nodes
 ```
 
-6. Upload the `cert.pem` and `key.pem` files twilio.
+1. Upload the `cert.pem` and `key.pem` files twilio.
 
 ```bash
 npx twilio api:chat:v2:credentials:create --type=apn --sandbox --friendly-name="voice-push-credential (sandbox)" --certificate="$(cat /Users/your_username/Documents/twilio-voip/cert.pem)" --private-key="$(cat /Users/your_username/Documents/twilio-voip/key.pem)"
@@ -236,6 +238,7 @@ npx twilio api:chat:v2:credentials:create --type=apn --sandbox --friendly-name="
 ## Android Setup
 
 ### 1. Firebase Setup
+
 Add Firebase to your Android project:
 
 1. Add `google-services.json` to `android/app/`
@@ -251,7 +254,7 @@ dependencies {
 }
 ```
 
-4. Modify `MainActivity.java`
+1. Modify `MainActivity.java`
 
 Add the following to `MainActivity.java`:
 
@@ -297,7 +300,7 @@ public class MainActivity extends BridgeActivity {
 }
 ```
 
-5. Register the plugin in JS
+1. Register the plugin in JS
 
 ```diff
 + import { CapacitorTwilioVoice } from '@capgo/capacitor-twilio-voice';
@@ -306,9 +309,9 @@ public class MainActivity extends BridgeActivity {
 + Capacitor.registerPlugin('CapacitorTwilioVoice');
 ```
 
-6. Add `android:name="CapacitorApplication"` to the `application` tag in `android/app/src/main/AndroidManifest.xml`
+1. Add `android:name="CapacitorApplication"` to the `application` tag in `android/app/src/main/AndroidManifest.xml`
 
-7. Add the following to `android/app/src/main/AndroidManifest.xml`:
+2. Add the following to `android/app/src/main/AndroidManifest.xml`:
 
 ```xml
     <uses-permission android:name="android.permission.WAKE_LOCK" />
@@ -320,8 +323,8 @@ Keep in mind, this will make it so that you app can be accessed when the screen 
 
 ## Twilio Setup
 
- - [iOS Setup](https://www.twilio.com/docs/voice/sdks/ios/get-started)
- - [Android Setup](https://www.twilio.com/docs/voice/sdks/android/get-started)
+- [iOS Setup](https://www.twilio.com/docs/voice/sdks/ios/get-started)
+- [Android Setup](https://www.twilio.com/docs/voice/sdks/android/get-started)
 
 ## Caller Name Display (CapacitorTwilioCallerName)
 
@@ -376,50 +379,68 @@ If `CapacitorTwilioCallerName` is not provided, the plugin falls back to the cal
 ### Authentication
 
 #### `login(options: { accessToken: string })`
+
 Authenticates with Twilio using a JWT access token:
+
 - Validates token expiration automatically
 - Stores token securely for app restarts  
 - Registers for VoIP push notifications
 - **Note**: The plugin will reject expired tokens
 
 #### `logout()`
+
 Logs out the current user and cleans up all session data:
+
 - Unregisters from VoIP push notifications
 - Clears stored access tokens
 - Ends any active calls
 - Resets all call state
 
 #### `isLoggedIn()`
+
 Checks if user is currently logged in with a valid (non-expired) token.
 Returns: `{ isLoggedIn: boolean, hasValidToken: boolean, identity?: string }`
 
 The `identity` field contains the user identity extracted from the JWT token if logged in.
 
 #### `makeCall(options: { to: string })`
+
 Initiates an outgoing call. Requires prior authentication via `login()`.
 
 #### `acceptCall(options: { callSid: string })`
+
 Accepts an incoming call.
 
 #### `rejectCall(options: { callSid: string })`
+
 Rejects an incoming call.
 
 #### `endCall(options?: { callSid?: string })`
+
 Ends the active call or a specific call.
 
 #### `muteCall(options: { muted: boolean, callSid?: string })`
+
 Mutes or unmutes the microphone.
 
+#### `sendDigits(options: { digits: string, callSid?: string })`
+
+Sends DTMF digits during an active call. Valid characters are 0-9, *, #, and w (for 0.5s pause).
+
 #### `setSpeaker(options: { enabled: boolean })`
+
 Enables or disables the speaker. On Android, uses Twilio AudioSwitch to manage audio routing between earpiece, speaker, and connected devices (headsets, Bluetooth, etc.).
 
 #### `getCallStatus()`
+
 Gets the current call status.
 
 #### `checkMicrophonePermission()`
+
 Checks if microphone permission is granted.
 
 #### `requestMicrophonePermission()`
+
 Requests microphone permission from the user.
 
 ### Event Listeners
@@ -469,7 +490,9 @@ CapacitorTwilioVoice.addListener('callQualityWarningsChanged', (data) => {
 ## JWT Token Management
 
 ### Token Format
+
 The plugin expects Twilio access tokens in JWT format with this structure:
+
 ```json
 {
   "iss": "your-account-sid",
@@ -487,12 +510,15 @@ The plugin expects Twilio access tokens in JWT format with this structure:
 ```
 
 ### Token Validation
+
 - Tokens are automatically validated for expiration
 - Invalid or expired tokens will be rejected
 - Use `isLoggedIn()` to check token status
 
 ### Backend Integration
+
 Fetch access tokens from your backend server:
+
 ```typescript
 async function fetchAccessToken(identity: string): Promise<string> {
   const response = await fetch(`/accessToken?identity=${identity}`);
@@ -503,17 +529,20 @@ async function fetchAccessToken(identity: string): Promise<string> {
 ## Testing Requirements
 
 ### iOS Simulator Limitations
+
 - VoIP push notifications don't work in the iOS Simulator
 - Use a physical iOS device for testing incoming calls
 - Outgoing calls work in both Simulator and device
 
 ### Android Emulator
+
 - Requires Google Play Services
 - Firebase messaging works in Android Emulator with Google APIs
 
 ## Error Handling
 
 The plugin provides detailed error information:
+
 ```typescript
 try {
   await CapacitorTwilioVoice.makeCall({ to: '+1234567890' });
@@ -523,6 +552,7 @@ try {
 ```
 
 Common error scenarios:
+
 - **Invalid token**: Check token format and expiration
 - **No microphone permission**: Call `requestMicrophonePermission()`
 - **Network issues**: Verify internet connectivity
@@ -555,10 +585,14 @@ Common error scenarios:
 * [`rejectCall(...)`](#rejectcall)
 * [`endCall(...)`](#endcall)
 * [`muteCall(...)`](#mutecall)
+* [`sendDigits(...)`](#senddigits)
 * [`setSpeaker(...)`](#setspeaker)
 * [`getCallStatus()`](#getcallstatus)
 * [`checkMicrophonePermission()`](#checkmicrophonepermission)
 * [`requestMicrophonePermission()`](#requestmicrophonepermission)
+* [`getAudioDevices()`](#getaudiodevices)
+* [`setInputDevice(...)`](#setinputdevice)
+* [`setOutputDevice(...)`](#setoutputdevice)
 * [`addListener('callInviteReceived', ...)`](#addlistenercallinvitereceived-)
 * [`addListener('callConnected', ...)`](#addlistenercallconnected-)
 * [`addListener('callInviteCancelled', ...)`](#addlistenercallinvitecancelled-)
@@ -571,6 +605,7 @@ Common error scenarios:
 * [`addListener('callQualityWarningsChanged', ...)`](#addlistenercallqualitywarningschanged-)
 * [`addListener('registrationSuccess', ...)`](#addlistenerregistrationsuccess-)
 * [`addListener('registrationFailure', ...)`](#addlistenerregistrationfailure-)
+* [`addListener('audioDevicesChanged', ...)`](#addlisteneraudiodeviceschanged-)
 * [`removeAllListeners()`](#removealllisteners)
 * [`getPluginVersion()`](#getpluginversion)
 * [Interfaces](#interfaces)
@@ -727,6 +762,23 @@ When muted, the other party will not hear audio from your microphone.
 --------------------
 
 
+### sendDigits(...)
+
+```typescript
+sendDigits(options: { digits: string; callSid?: string; }) => Promise<{ success: boolean; }>
+```
+
+Send DTMF digits during an active call.
+
+| Param         | Type                                               | Description            |
+| ------------- | -------------------------------------------------- | ---------------------- |
+| **`options`** | <code>{ digits: string; callSid?: string; }</code> | - Configuration object |
+
+**Returns:** <code>Promise&lt;{ success: boolean; }&gt;</code>
+
+--------------------
+
+
 ### setSpeaker(...)
 
 ```typescript
@@ -790,6 +842,67 @@ has not been granted yet. If permission was previously denied, the user may need
 to grant it in system settings.
 
 **Returns:** <code>Promise&lt;{ granted: boolean; }&gt;</code>
+
+--------------------
+
+
+### getAudioDevices()
+
+```typescript
+getAudioDevices() => Promise<{ inputs: AudioDevice[]; outputs: AudioDevice[]; }>
+```
+
+Get available audio input and output devices.
+
+On web/Electron: Enumerates system audio devices using the Web Audio API.
+Requires microphone permission to have been granted for device labels to be available.
+On iOS/Android: Returns empty arrays (audio routing is handled by the OS).
+
+**Returns:** <code>Promise&lt;{ inputs: AudioDevice[]; outputs: AudioDevice[]; }&gt;</code>
+
+--------------------
+
+
+### setInputDevice(...)
+
+```typescript
+setInputDevice(options: { deviceId: string; }) => Promise<{ success: boolean; }>
+```
+
+Select a specific audio input device (microphone).
+
+On web/Electron: Routes microphone input through the specified device.
+The device stays active until another input is selected, the call ends,
+or `logout()` is called.
+On iOS/Android: No-op, returns `{ success: true }`.
+
+| Param         | Type                               | Description            |
+| ------------- | ---------------------------------- | ---------------------- |
+| **`options`** | <code>{ deviceId: string; }</code> | - Configuration object |
+
+**Returns:** <code>Promise&lt;{ success: boolean; }&gt;</code>
+
+--------------------
+
+
+### setOutputDevice(...)
+
+```typescript
+setOutputDevice(options: { deviceId: string; }) => Promise<{ success: boolean; }>
+```
+
+Select a specific audio output device (speaker/headphones).
+
+On web/Electron: Routes call audio and ringtone through the specified device.
+Requires browser support for the `setSinkId` API. Check `getAudioDevices()` for
+available outputs — if the array is empty, output selection is not supported.
+On iOS/Android: No-op, returns `{ success: true }`.
+
+| Param         | Type                               | Description            |
+| ------------- | ---------------------------------- | ---------------------- |
+| **`options`** | <code>{ deviceId: string; }</code> | - Configuration object |
+
+**Returns:** <code>Promise&lt;{ success: boolean; }&gt;</code>
 
 --------------------
 
@@ -1046,6 +1159,28 @@ Twilio service problems.
 --------------------
 
 
+### addListener('audioDevicesChanged', ...)
+
+```typescript
+addListener(eventName: 'audioDevicesChanged', listenerFunc: (data: { inputs: AudioDevice[]; outputs: AudioDevice[]; }) => void) => Promise<PluginListenerHandle>
+```
+
+Listen for audio device changes.
+
+This event is fired when audio input/output devices are added or removed
+from the system (e.g., plugging in headphones, connecting Bluetooth).
+Web/Electron only — this event is never fired on iOS/Android.
+
+| Param              | Type                                                                               | Description                              |
+| ------------------ | ---------------------------------------------------------------------------------- | ---------------------------------------- |
+| **`eventName`**    | <code>'audioDevicesChanged'</code>                                                 | - The event name ('audioDevicesChanged') |
+| **`listenerFunc`** | <code>(data: { inputs: AudioDevice[]; outputs: AudioDevice[]; }) =&gt; void</code> | - Callback function to handle the event  |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+--------------------
+
+
 ### removeAllListeners()
 
 ```typescript
@@ -1090,6 +1225,21 @@ but not yet accepted or rejected. The same structure is used both in the
 | **`from`**         | <code>string</code>                                             | Phone number or client identifier of the caller (may include custom caller name) |
 | **`to`**           | <code>string</code>                                             | Phone number or client identifier being called                                   |
 | **`customParams`** | <code><a href="#record">Record</a>&lt;string, string&gt;</code> | Custom parameters passed with the call invitation                                |
+
+
+#### AudioDevice
+
+Represents an audio device (microphone or speaker) available for use.
+
+This interface is used by the web implementation to enumerate and select
+specific audio input/output devices. On iOS and Android, audio routing is
+handled by the OS (earpiece/speaker toggle, Bluetooth).
+
+| Prop           | Type                                       | Description                                                       |
+| -------------- | ------------------------------------------ | ----------------------------------------------------------------- |
+| **`deviceId`** | <code>string</code>                        | Browser-assigned unique identifier for this device                |
+| **`label`**    | <code>string</code>                        | Human-readable label (e.g., "Built-in Microphone", "AirPods Pro") |
+| **`kind`**     | <code>'audioinput' \| 'audiooutput'</code> | Whether this is an input (microphone) or output (speaker) device  |
 
 
 #### PluginListenerHandle

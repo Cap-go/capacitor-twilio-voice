@@ -1223,6 +1223,36 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
     }
 
     @PluginMethod
+    public void sendDigits(PluginCall call) {
+        String digits = call.getString("digits");
+        if (digits == null) {
+            call.reject("digits parameter is required");
+            return;
+        }
+
+        String callSid = call.getString("callSid");
+        Call targetCall = null;
+
+        if (callSid != null) {
+            if (activeCalls.containsKey(callSid)) {
+                targetCall = activeCalls.get(callSid);
+            }
+        } else {
+            targetCall = activeCall;
+        }
+
+        if (targetCall == null) {
+            call.reject("No active call found");
+            return;
+        }
+
+        targetCall.sendDigits(digits);
+        JSObject ret = new JSObject();
+        ret.put("success", true);
+        call.resolve(ret);
+    }
+
+    @PluginMethod
     public void muteCall(PluginCall call) {
         boolean muted = call.getBoolean("muted", false);
 
@@ -1830,4 +1860,30 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             call.reject("Could not get plugin version", e);
         }
     }
+
+    // Audio Device Selection (Web-only, stubs for native)
+
+    @PluginMethod
+    public void getAudioDevices(final PluginCall call) {
+        // Audio device selection is only supported on web platform.
+        // On Android, the system manages audio routing automatically.
+        final JSObject ret = new JSObject();
+        ret.put("devices", new com.getcapacitor.JSArray());
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void setInputDevice(final PluginCall call) {
+        // Audio device selection is only supported on web platform.
+        final JSObject ret = new JSObject();
+        ret.put("success", true);
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void setOutputDevice(final PluginCall call) {
+        // Audio device selection is only supported on web platform.
+        final JSObject ret = new JSObject();
+        ret.put("success", true);
+        call.resolve(ret);
 }
