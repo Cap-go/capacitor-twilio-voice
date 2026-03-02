@@ -1,6 +1,13 @@
 const fs = require('fs');
 const path = require('path');
 
+// Only run on Android — iOS/web don't use capacitor.plugins.json
+const platform = process.env.CAPACITOR_PLATFORM_NAME;
+if (platform !== 'android') {
+  console.log(`[twilio-voice] Skipping plugin removal for platform: ${platform || 'unknown'}`);
+  process.exit(0);
+}
+
 // Get the CAPACITOR_ROOT_DIR environment variable
 const capacitorRootDir = process.env.CAPACITOR_ROOT_DIR;
 
