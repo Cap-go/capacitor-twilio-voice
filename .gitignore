@@ -1,5 +1,5 @@
 # node files
-dist
+# dist — committed so github: installs work without building
 node_modules
 
 # iOS files

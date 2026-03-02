@@ -1,0 +1,1340 @@
+{
+  "api": {
+    "name": "CapacitorTwilioVoicePlugin",
+    "slug": "capacitortwiliovoiceplugin",
+    "docs": "",
+    "tags": [],
+    "methods": [
+      {
+        "name": "login",
+        "signature": "(options: { accessToken: string; }) => Promise<{ success: boolean; }>",
+        "parameters": [
+          {
+            "name": "options",
+            "docs": "- Configuration object",
+            "type": "{ accessToken: string; }"
+          }
+        ],
+        "returns": "Promise<{ success: boolean; }>",
+        "tags": [
+          {
+            "name": "param",
+            "text": "options - Configuration object"
+          },
+          {
+            "name": "param",
+            "text": "options.accessToken - Twilio access token obtained from your backend server"
+          },
+          {
+            "name": "returns",
+            "text": "Promise that resolves with success status"
+          },
+          {
+            "name": "example",
+            "text": "```typescript\nconst result = await CapacitorTwilioVoice.login({\n  accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'\n});\nconsole.log('Login successful:', result.success);\n```"
+          }
+        ],
+        "docs": "Authenticate the user with Twilio Voice using an access token.\n\nThe access token should be generated on your backend server using your Twilio credentials.\nThis token is required to make and receive calls through Twilio Voice.",
+        "complexTypes": [],
+        "slug": "login"
+      },
+      {
+        "name": "logout",
+        "signature": "() => Promise<{ success: boolean; }>",
+        "parameters": [],
+        "returns": "Promise<{ success: boolean; }>",
+        "tags": [
+          {
+            "name": "returns",
+            "text": "Promise that resolves with success status"
+          },
+          {
+            "name": "example",
+            "text": "```typescript\nconst result = await CapacitorTwilioVoice.logout();\nconsole.log('Logout successful:', result.success);\n```"
+          }
+        ],
+        "docs": "Log out the current user and unregister from Twilio Voice.\n\nThis will disconnect any active calls and stop the device from receiving\nnew incoming call notifications.",
+        "complexTypes": [],
+        "slug": "logout"
+      },
+      {
+        "name": "isLoggedIn",
+        "signature": "() => Promise<{ isLoggedIn: boolean; hasValidToken: boolean; identity?: string; }>",
+        "parameters": [],
+        "returns": "Promise<{ isLoggedIn: boolean; hasValidToken: boolean; identity?: string | undefined; }>",
+        "tags": [
+          {
+            "name": "returns",
+            "text": "Promise that resolves with login status information"
+          },
+          {
+            "name": "returns",
+            "text": "isLoggedIn - Whether the user is currently logged in"
+          },
+          {
+            "name": "returns",
+            "text": "hasValidToken - Whether the access token is still valid"
+          },
+          {
+            "name": "returns",
+            "text": "identity - The user's Twilio identity (if logged in)"
+          },
+          {
+            "name": "example",
+            "text": "```typescript\nconst status = await CapacitorTwilioVoice.isLoggedIn();\nif (status.isLoggedIn && status.hasValidToken) {\n  console.log('User identity:', status.identity);\n} else {\n  // Re-authenticate the user\n}\n```"
+          }
+        ],
+        "docs": "Check if the user is currently logged in and has a valid access token.",
+        "complexTypes": [],
+        "slug": "isloggedin"
+      },
+      {
+        "name": "makeCall",
+        "signature": "(options: { to: string; params?: Record<string, string>; }) => Promise<{ success: boolean; callSid?: string; }>",
+        "parameters": [
+          {
+            "name": "options",
+            "docs": "- Configuration object",
+            "type": "{ to: string; params?: Record<string, string> | undefined; }"
+          }
+        ],
+        "returns": "Promise<{ success: boolean; callSid?: string | undefined; }>",
+        "tags": [
+          {
+            "name": "param",
+            "text": "options - Configuration object"
+          },
+          {
+            "name": "param",
+            "text": "options.to - Phone number (E.164 format) or Twilio client identifier to call"
+          },
+          {
+            "name": "returns",
+            "text": "Promise that resolves with success status and call SID"
+          },
+          {
+            "name": "returns",
+            "text": "success - Whether the call was initiated successfully"
+          },
+          {
+            "name": "returns",
+            "text": "callSid - Unique identifier for this call (if successful)"
+          },
+          {
+            "name": "example",
+            "text": "```typescript\n// Call a phone number\nconst result = await CapacitorTwilioVoice.makeCall({\n  to: '+1234567890'\n});\nconsole.log('Call SID:', result.callSid);\n\n// Call another Twilio client\nawait CapacitorTwilioVoice.makeCall({\n  to: 'client:alice'\n});\n```"
+          }
+        ],
+        "docs": "Initiate an outgoing call to a phone number or client.\n\nThe user must be logged in before making a call. The call will be routed\nthrough your Twilio backend configuration.",
+        "complexTypes": [
+          "Record"
+        ],
+        "slug": "makecall"
+      },
+      {
+        "name": "acceptCall",
+        "signature": "(options: { callSid: string; }) => Promise<{ success: boolean; }>",
+        "parameters": [
+          {
+            "name": "options",
+            "docs": "- Configuration object",
+            "type": "{ callSid: string; }"
+          }
+        ],
+        "returns": "Promise<{ success: boolean; }>",
+        "tags": [
+          {
+            "name": "param",
+            "text": "options - Configuration object"
+          },
+          {
+            "name": "param",
+            "text": "options.callSid - Unique identifier of the call to accept"
+          },
+          {
+            "name": "returns",
+            "text": "Promise that resolves with success status"
+          },
+          {
+            "name": "example",
+            "text": "```typescript\nCapacitorTwilioVoice.addListener('callInviteReceived', async (data) => {\n  console.log('Incoming call from:', data.from);\n  const result = await CapacitorTwilioVoice.acceptCall({\n    callSid: data.callSid\n  });\n  console.log('Call accepted:', result.success);\n});\n```"
+          }
+        ],
+        "docs": "Accept an incoming call.\n\nThis should be called in response to a 'callInviteReceived' event.",
+        "complexTypes": [],
+        "slug": "acceptcall"
+      },
+      {
+        "name": "rejectCall",
+        "signature": "(options: { callSid: string; }) => Promise<{ success: boolean; }>",
+        "parameters": [
+          {
+            "name": "options",
+            "docs": "- Configuration object",
+            "type": "{ callSid: string; }"
+          }
+        ],
+        "returns": "Promise<{ success: boolean; }>",
+        "tags": [
+          {
+            "name": "param",
+            "text": "options - Configuration object"
+          },
+          {
+            "name": "param",
+            "text": "options.callSid - Unique identifier of the call to reject"
+          },
+          {
+            "name": "returns",
+            "text": "Promise that resolves with success status"
+          },
+          {
+            "name": "example",
+            "text": "```typescript\nCapacitorTwilioVoice.addListener('callInviteReceived', async (data) => {\n  if (shouldRejectCall(data.from)) {\n    await CapacitorTwilioVoice.rejectCall({\n      callSid: data.callSid\n    });\n  }\n});\n```"
+          }
+        ],
+        "docs": "Reject an incoming call.\n\nThis should be called in response to a 'callInviteReceived' event.\nThe caller will hear a busy signal or be directed to voicemail.",
+        "complexTypes": [],
+        "slug": "rejectcall"
+      },
+      {
+        "name": "endCall",
+        "signature": "(options: { callSid?: string; }) => Promise<{ success: boolean; }>",
+        "parameters": [
+          {
+            "name": "options",
+            "docs": "- Configuration object",
+            "type": "{ callSid?: string | undefined; }"
+          }
+        ],
+        "returns": "Promise<{ success: boolean; }>",
+        "tags": [
+          {
+            "name": "param",
+            "text": "options - Configuration object"
+          },
+          {
+            "name": "param",
+            "text": "options.callSid - Unique identifier of the call to end (optional, defaults to current active call)"
+          },
+          {
+            "name": "returns",
+            "text": "Promise that resolves with success status"
+          },
+          {
+            "name": "example",
+            "text": "```typescript\n// End the current active call\nawait CapacitorTwilioVoice.endCall({});\n\n// End a specific call\nawait CapacitorTwilioVoice.endCall({\n  callSid: 'CA1234567890abcdef'\n});\n```"
+          }
+        ],
+        "docs": "End an active call.\n\nIf callSid is not provided, this will end the currently active call.",
+        "complexTypes": [],
+        "slug": "endcall"
+      },
+      {
+        "name": "muteCall",
+        "signature": "(options: { muted: boolean; callSid?: string; }) => Promise<{ success: boolean; }>",
+        "parameters": [
+          {
+            "name": "options",
+            "docs": "- Configuration object",
+            "type": "{ muted: boolean; callSid?: string | undefined; }"
+          }
+        ],
+        "returns": "Promise<{ success: boolean; }>",
+        "tags": [
+          {
+            "name": "param",
+            "text": "options - Configuration object"
+          },
+          {
+            "name": "param",
+            "text": "options.muted - Whether to mute (true) or unmute (false) the microphone"
+          },
+          {
+            "name": "param",
+            "text": "options.callSid - Unique identifier of the call (optional, defaults to current active call)"
+          },
+          {
+            "name": "returns",
+            "text": "Promise that resolves with success status"
+          },
+          {
+            "name": "example",
+            "text": "```typescript\n// Mute the microphone\nawait CapacitorTwilioVoice.muteCall({\n  muted: true\n});\n\n// Unmute the microphone\nawait CapacitorTwilioVoice.muteCall({\n  muted: false\n});\n```"
+          }
+        ],
+        "docs": "Mute or unmute the microphone during an active call.\n\nWhen muted, the other party will not hear audio from your microphone.",
+        "complexTypes": [],
+        "slug": "mutecall"
+      },
+      {
+        "name": "sendDigits",
+        "signature": "(options: { digits: string; callSid?: string; }) => Promise<{ success: boolean; }>",
+        "parameters": [
+          {
+            "name": "options",
+            "docs": "- Configuration object",
+            "type": "{ digits: string; callSid?: string | undefined; }"
+          }
+        ],
+        "returns": "Promise<{ success: boolean; }>",
+        "tags": [
+          {
+            "name": "param",
+            "text": "options - Configuration object"
+          },
+          {
+            "name": "param",
+            "text": "options.digits - The digit string to send. Valid characters are 0-9, *, #, and w (for 0.5s pause)."
+          },
+          {
+            "name": "param",
+            "text": "options.callSid - Unique identifier of the call (optional, defaults to current active call)"
+          },
+          {
+            "name": "returns",
+            "text": "Promise that resolves with success status"
+          },
+          {
+            "name": "example",
+            "text": "```typescript\n// Send digits \"1234\"\nawait CapacitorTwilioVoice.sendDigits({\n  digits: '1234'\n});\n\n// Send digits with pauses \"1w2w3\"\nawait CapacitorTwilioVoice.sendDigits({\n  digits: '1w2w3'\n});\n```"
+          }
+        ],
+        "docs": "Send DTMF digits during an active call.",
+        "complexTypes": [],
+        "slug": "senddigits"
+      },
+      {
+        "name": "setSpeaker",
+        "signature": "(options: { enabled: boolean; }) => Promise<{ success: boolean; }>",
+        "parameters": [
+          {
+            "name": "options",
+            "docs": "- Configuration object",
+            "type": "{ enabled: boolean; }"
+          }
+        ],
+        "returns": "Promise<{ success: boolean; }>",
+        "tags": [
+          {
+            "name": "param",
+            "text": "options - Configuration object"
+          },
+          {
+            "name": "param",
+            "text": "options.enabled - Whether to enable (true) or disable (false) speakerphone mode"
+          },
+          {
+            "name": "returns",
+            "text": "Promise that resolves with success status"
+          },
+          {
+            "name": "example",
+            "text": "```typescript\n// Enable speakerphone\nawait CapacitorTwilioVoice.setSpeaker({\n  enabled: true\n});\n\n// Disable speakerphone\nawait CapacitorTwilioVoice.setSpeaker({\n  enabled: false\n});\n```"
+          }
+        ],
+        "docs": "Enable or disable speakerphone mode.\n\nWhen enabled, audio will be routed through the device's speaker instead of the earpiece.",
+        "complexTypes": [],
+        "slug": "setspeaker"
+      },
+      {
+        "name": "getCallStatus",
+        "signature": "() => Promise<{ hasActiveCall: boolean; isOnHold: boolean; isMuted: boolean; callSid?: string; callState?: string; pendingInvites: CallInvite[]; activeCallsCount: number; }>",
+        "parameters": [],
+        "returns": "Promise<{ hasActiveCall: boolean; isOnHold: boolean; isMuted: boolean; callSid?: string | undefined; callState?: string | undefined; pendingInvites: CallInvite[]; activeCallsCount: number; }>",
+        "tags": [
+          {
+            "name": "returns",
+            "text": "Promise that resolves with call status information"
+          },
+          {
+            "name": "returns",
+            "text": "hasActiveCall - Whether there is currently an active call"
+          },
+          {
+            "name": "returns",
+            "text": "isOnHold - Whether the call is on hold"
+          },
+          {
+            "name": "returns",
+            "text": "isMuted - Whether the microphone is muted"
+          },
+          {
+            "name": "returns",
+            "text": "callSid - Unique identifier of the active call (if any)"
+          },
+          {
+            "name": "returns",
+            "text": "callState - Current state of the call (e.g., 'connecting', 'connected', 'ringing')"
+          },
+          {
+            "name": "returns",
+            "text": "pendingInvites - Array of pending incoming call invitations with the same data as callInviteReceived"
+          },
+          {
+            "name": "returns",
+            "text": "activeCallsCount - Total number of active calls being tracked"
+          },
+          {
+            "name": "example",
+            "text": "```typescript\nconst status = await CapacitorTwilioVoice.getCallStatus();\nif (status.hasActiveCall) {\n  console.log('Call SID:', status.callSid);\n  console.log('Call State:', status.callState);\n  console.log('Is Muted:', status.isMuted);\n  console.log('Is On Hold:', status.isOnHold);\n}\n```"
+          }
+        ],
+        "docs": "Get the current status of the active call.\n\nThis provides real-time information about the call state, mute status,\nhold status, and call identifiers.",
+        "complexTypes": [
+          "CallInvite"
+        ],
+        "slug": "getcallstatus"
+      },
+      {
+        "name": "checkMicrophonePermission",
+        "signature": "() => Promise<{ granted: boolean; }>",
+        "parameters": [],
+        "returns": "Promise<{ granted: boolean; }>",
+        "tags": [
+          {
+            "name": "returns",
+            "text": "Promise that resolves with permission status"
+          },
+          {
+            "name": "returns",
+            "text": "granted - Whether microphone permission has been granted"
+          },
+          {
+            "name": "example",
+            "text": "```typescript\nconst result = await CapacitorTwilioVoice.checkMicrophonePermission();\nif (!result.granted) {\n  console.log('Microphone permission not granted');\n}\n```"
+          }
+        ],
+        "docs": "Check if microphone permission has been granted.\n\nThis does not request permission, only checks the current permission status.",
+        "complexTypes": [],
+        "slug": "checkmicrophonepermission"
+      },
+      {
+        "name": "requestMicrophonePermission",
+        "signature": "() => Promise<{ granted: boolean; }>",
+        "parameters": [],
+        "returns": "Promise<{ granted: boolean; }>",
+        "tags": [
+          {
+            "name": "returns",
+            "text": "Promise that resolves with permission status"
+          },
+          {
+            "name": "returns",
+            "text": "granted - Whether microphone permission was granted"
+          },
+          {
+            "name": "example",
+            "text": "```typescript\nconst result = await CapacitorTwilioVoice.requestMicrophonePermission();\nif (result.granted) {\n  console.log('Microphone permission granted');\n} else {\n  console.log('Microphone permission denied');\n}\n```"
+          }
+        ],
+        "docs": "Request microphone permission from the user.\n\nOn iOS and Android, this will show the system permission dialog if permission\nhas not been granted yet. If permission was previously denied, the user may need\nto grant it in system settings.",
+        "complexTypes": [],
+        "slug": "requestmicrophonepermission"
+      },
+      {
+        "name": "getAudioDevices",
+        "signature": "() => Promise<{ inputs: AudioDevice[]; outputs: AudioDevice[]; }>",
+        "parameters": [],
+        "returns": "Promise<{ inputs: AudioDevice[]; outputs: AudioDevice[]; }>",
+        "tags": [
+          {
+            "name": "returns",
+            "text": "Promise with arrays of input (microphone) and output (speaker) AudioDevice objects"
+          },
+          {
+            "name": "example",
+            "text": "```typescript\nconst { inputs, outputs } = await CapacitorTwilioVoice.getAudioDevices();\nconsole.log('Available microphones:', inputs);\nconsole.log('Available speakers:', outputs);\n```"
+          }
+        ],
+        "docs": "Get available audio input and output devices.\n\nOn web/Electron: Enumerates system audio devices using the Web Audio API.\nRequires microphone permission to have been granted for device labels to be available.\nOn iOS/Android: Returns empty arrays (audio routing is handled by the OS).",
+        "complexTypes": [
+          "AudioDevice"
+        ],
+        "slug": "getaudiodevices"
+      },
+      {
+        "name": "setInputDevice",
+        "signature": "(options: { deviceId: string; }) => Promise<{ success: boolean; }>",
+        "parameters": [
+          {
+            "name": "options",
+            "docs": "- Configuration object",
+            "type": "{ deviceId: string; }"
+          }
+        ],
+        "returns": "Promise<{ success: boolean; }>",
+        "tags": [
+          {
+            "name": "param",
+            "text": "options - Configuration object"
+          },
+          {
+            "name": "param",
+            "text": "options.deviceId - The deviceId of the desired input device (from `getAudioDevices()`)"
+          },
+          {
+            "name": "returns",
+            "text": "Promise that resolves with success status"
+          },
+          {
+            "name": "example",
+            "text": "```typescript\nconst { inputs } = await CapacitorTwilioVoice.getAudioDevices();\nif (inputs.length > 1) {\n  await CapacitorTwilioVoice.setInputDevice({ deviceId: inputs[1].deviceId });\n}\n```"
+          }
+        ],
+        "docs": "Select a specific audio input device (microphone).\n\nOn web/Electron: Routes microphone input through the specified device.\nThe device stays active until another input is selected, the call ends,\nor `logout()` is called.\nOn iOS/Android: No-op, returns `{ success: true }`.",
+        "complexTypes": [],
+        "slug": "setinputdevice"
+      },
+      {
+        "name": "setOutputDevice",
+        "signature": "(options: { deviceId: string; }) => Promise<{ success: boolean; }>",
+        "parameters": [
+          {
+            "name": "options",
+            "docs": "- Configuration object",
+            "type": "{ deviceId: string; }"
+          }
+        ],
+        "returns": "Promise<{ success: boolean; }>",
+        "tags": [
+          {
+            "name": "param",
+            "text": "options - Configuration object"
+          },
+          {
+            "name": "param",
+            "text": "options.deviceId - The deviceId of the desired output device (from `getAudioDevices()`)"
+          },
+          {
+            "name": "returns",
+            "text": "Promise that resolves with success status"
+          },
+          {
+            "name": "example",
+            "text": "```typescript\nconst { outputs } = await CapacitorTwilioVoice.getAudioDevices();\nif (outputs.length > 1) {\n  await CapacitorTwilioVoice.setOutputDevice({ deviceId: outputs[1].deviceId });\n}\n```"
+          }
+        ],
+        "docs": "Select a specific audio output device (speaker/headphones).\n\nOn web/Electron: Routes call audio and ringtone through the specified device.\nRequires browser support for the `setSinkId` API. Check `getAudioDevices()` for\navailable outputs — if the array is empty, output selection is not supported.\nOn iOS/Android: No-op, returns `{ success: true }`.",
+        "complexTypes": [],
+        "slug": "setoutputdevice"
+      },
+      {
+        "name": "addListener",
+        "signature": "(eventName: 'callInviteReceived', listenerFunc: (data: CallInvite) => void) => Promise<PluginListenerHandle>",
+        "parameters": [
+          {
+            "name": "eventName",
+            "docs": "- The event name ('callInviteReceived')",
+            "type": "'callInviteReceived'"
+          },
+          {
+            "name": "listenerFunc",
+            "docs": "- Callback function to handle the event",
+            "type": "(data: CallInvite) => void"
+          }
+        ],
+        "returns": "Promise<PluginListenerHandle>",
+        "tags": [
+          {
+            "name": "param",
+            "text": "eventName - The event name ('callInviteReceived')"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc - Callback function to handle the event"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc.data - Event data of type {@link CallInvite}"
+          },
+          {
+            "name": "returns",
+            "text": "Promise that resolves with a listener handle for removing the listener"
+          },
+          {
+            "name": "example",
+            "text": "```typescript\nconst listener = await CapacitorTwilioVoice.addListener(\n  'callInviteReceived',\n  (data) => {\n    console.log('Incoming call from:', data.from);\n    console.log('Call SID:', data.callSid);\n    console.log('Custom params:', data.customParams);\n  }\n);\n\n// Remove listener when no longer needed\nawait listener.remove();\n```"
+          }
+        ],
+        "docs": "Listen for incoming call invitations.\n\nThis event is fired when another user or phone number is calling you.\nYou should call acceptCall() or rejectCall() in response.",
+        "complexTypes": [
+          "PluginListenerHandle",
+          "CallInvite"
+        ],
+        "slug": "addlistenercallinvitereceived-"
+      },
+      {
+        "name": "addListener",
+        "signature": "(eventName: 'callConnected', listenerFunc: (data: { callSid: string; }) => void) => Promise<PluginListenerHandle>",
+        "parameters": [
+          {
+            "name": "eventName",
+            "docs": "- The event name ('callConnected')",
+            "type": "'callConnected'"
+          },
+          {
+            "name": "listenerFunc",
+            "docs": "- Callback function to handle the event",
+            "type": "(data: { callSid: string; }) => void"
+          }
+        ],
+        "returns": "Promise<PluginListenerHandle>",
+        "tags": [
+          {
+            "name": "param",
+            "text": "eventName - The event name ('callConnected')"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc - Callback function to handle the event"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc.data - Event data"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc.data.callSid - Unique identifier for the connected call"
+          },
+          {
+            "name": "returns",
+            "text": "Promise that resolves with a listener handle for removing the listener"
+          },
+          {
+            "name": "example",
+            "text": "```typescript\nawait CapacitorTwilioVoice.addListener('callConnected', (data) => {\n  console.log('Call connected:', data.callSid);\n  // Start call timer, update UI, etc.\n});\n```"
+          }
+        ],
+        "docs": "Listen for call connected events.\n\nThis event is fired when a call (incoming or outgoing) has been successfully\nconnected and audio can be heard.",
+        "complexTypes": [
+          "PluginListenerHandle"
+        ],
+        "slug": "addlistenercallconnected-"
+      },
+      {
+        "name": "addListener",
+        "signature": "(eventName: 'callInviteCancelled', listenerFunc: (data: { callSid: string; reason: 'user_declined' | 'remote_cancelled'; }) => void) => Promise<PluginListenerHandle>",
+        "parameters": [
+          {
+            "name": "eventName",
+            "docs": "- The event name ('callInviteCancelled')",
+            "type": "'callInviteCancelled'"
+          },
+          {
+            "name": "listenerFunc",
+            "docs": "- Callback function to handle the event",
+            "type": "(data: { callSid: string; reason: 'user_declined' | 'remote_cancelled'; }) => void"
+          }
+        ],
+        "returns": "Promise<PluginListenerHandle>",
+        "tags": [
+          {
+            "name": "param",
+            "text": "eventName - The event name ('callInviteCancelled')"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc - Callback function to handle the event"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc.data - Event data"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc.data.callSid - Unique identifier for the cancelled call"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc.data.reason - Reason for cancellation ('user_declined' or 'remote_cancelled')"
+          },
+          {
+            "name": "returns",
+            "text": "Promise that resolves with a listener handle for removing the listener"
+          },
+          {
+            "name": "example",
+            "text": "```typescript\nawait CapacitorTwilioVoice.addListener('callInviteCancelled', (data) => {\n  if (data.reason === 'remote_cancelled') {\n    console.log('Caller hung up before you answered');\n  } else {\n    console.log('You declined the call');\n  }\n});\n```"
+          }
+        ],
+        "docs": "Listen for call invite cancellation events.\n\nThis event is fired when an incoming call invitation is cancelled before being\nanswered, either by the caller hanging up or by the user declining.",
+        "complexTypes": [
+          "PluginListenerHandle"
+        ],
+        "slug": "addlistenercallinvitecancelled-"
+      },
+      {
+        "name": "addListener",
+        "signature": "(eventName: 'outgoingCallInitiated', listenerFunc: (data: { callSid: string; to: string; source: 'app' | 'system'; displayName?: string; }) => void) => Promise<PluginListenerHandle>",
+        "parameters": [
+          {
+            "name": "eventName",
+            "docs": "- The event name ('outgoingCallInitiated')",
+            "type": "'outgoingCallInitiated'"
+          },
+          {
+            "name": "listenerFunc",
+            "docs": "- Callback function to handle the event",
+            "type": "(data: { callSid: string; to: string; source: 'app' | 'system'; displayName?: string | undefined; }) => void"
+          }
+        ],
+        "returns": "Promise<PluginListenerHandle>",
+        "tags": [
+          {
+            "name": "param",
+            "text": "eventName - The event name ('outgoingCallInitiated')"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc - Callback function to handle the event"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc.data - Event data"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc.data.callSid - Unique identifier for the outgoing call"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc.data.to - Phone number or client identifier being called"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc.data.source - Source of the call ('app' or 'system')"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc.data.displayName - Display name for the recipient (optional)"
+          },
+          {
+            "name": "returns",
+            "text": "Promise that resolves with a listener handle for removing the listener"
+          },
+          {
+            "name": "example",
+            "text": "```typescript\nawait CapacitorTwilioVoice.addListener('outgoingCallInitiated', (data) => {\n  console.log('Calling:', data.to);\n  console.log('Call initiated from:', data.source);\n  // Update UI to show outgoing call screen\n});\n```"
+          }
+        ],
+        "docs": "Listen for outgoing call initiation events.\n\nThis event is fired when an outgoing call is initiated, either from the app\nor from the system (e.g., CallKit on iOS, Telecom on Android).",
+        "complexTypes": [
+          "PluginListenerHandle"
+        ],
+        "slug": "addlisteneroutgoingcallinitiated-"
+      },
+      {
+        "name": "addListener",
+        "signature": "(eventName: 'outgoingCallFailed', listenerFunc: (data: { callSid: string; to: string; reason: 'missing_access_token' | 'connection_failed' | 'no_call_details' | 'microphone_permission_denied' | 'invalid_contact' | 'callkit_request_failed' | 'unsupported_intent'; displayName?: string; }) => void) => Promise<PluginListenerHandle>",
+        "parameters": [
+          {
+            "name": "eventName",
+            "docs": "- The event name ('outgoingCallFailed')",
+            "type": "'outgoingCallFailed'"
+          },
+          {
+            "name": "listenerFunc",
+            "docs": "- Callback function to handle the event",
+            "type": "(data: { callSid: string; to: string; reason: 'missing_access_token' | 'connection_failed' | 'no_call_details' | 'microphone_permission_denied' | 'invalid_contact' | 'callkit_request_failed' | 'unsupported_intent'; displayName?: string | undefined; }) => void"
+          }
+        ],
+        "returns": "Promise<PluginListenerHandle>",
+        "tags": [
+          {
+            "name": "param",
+            "text": "eventName - The event name ('outgoingCallFailed')"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc - Callback function to handle the event"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc.data - Event data"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc.data.callSid - Unique identifier for the failed call"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc.data.to - Phone number or client identifier that was being called"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc.data.reason - Reason for the failure"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc.data.displayName - Display name for the recipient (optional)"
+          },
+          {
+            "name": "returns",
+            "text": "Promise that resolves with a listener handle for removing the listener"
+          },
+          {
+            "name": "example",
+            "text": "```typescript\nawait CapacitorTwilioVoice.addListener('outgoingCallFailed', (data) => {\n  console.error('Call to', data.to, 'failed:', data.reason);\n\n  switch (data.reason) {\n    case 'missing_access_token':\n      // User needs to login\n      break;\n    case 'microphone_permission_denied':\n      // Request microphone permission\n      break;\n    case 'connection_failed':\n      // Network issue, retry later\n      break;\n  }\n});\n```"
+          }
+        ],
+        "docs": "Listen for outgoing call failure events.\n\nThis event is fired when an outgoing call fails to connect due to various reasons\nsuch as missing credentials, permission issues, or network problems.",
+        "complexTypes": [
+          "PluginListenerHandle"
+        ],
+        "slug": "addlisteneroutgoingcallfailed-"
+      },
+      {
+        "name": "addListener",
+        "signature": "(eventName: 'callDisconnected', listenerFunc: (data: { callSid: string; error?: string; }) => void) => Promise<PluginListenerHandle>",
+        "parameters": [
+          {
+            "name": "eventName",
+            "docs": "- The event name ('callDisconnected')",
+            "type": "'callDisconnected'"
+          },
+          {
+            "name": "listenerFunc",
+            "docs": "- Callback function to handle the event",
+            "type": "(data: { callSid: string; error?: string | undefined; }) => void"
+          }
+        ],
+        "returns": "Promise<PluginListenerHandle>",
+        "tags": [
+          {
+            "name": "param",
+            "text": "eventName - The event name ('callDisconnected')"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc - Callback function to handle the event"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc.data - Event data"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc.data.callSid - Unique identifier for the disconnected call"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc.data.error - Error message if the call was disconnected due to an error (optional)"
+          },
+          {
+            "name": "returns",
+            "text": "Promise that resolves with a listener handle for removing the listener"
+          },
+          {
+            "name": "example",
+            "text": "```typescript\nawait CapacitorTwilioVoice.addListener('callDisconnected', (data) => {\n  console.log('Call ended:', data.callSid);\n  if (data.error) {\n    console.error('Call ended with error:', data.error);\n  }\n  // Update UI, stop call timer, etc.\n});\n```"
+          }
+        ],
+        "docs": "Listen for call disconnection events.\n\nThis event is fired when a call ends, either normally or due to an error.",
+        "complexTypes": [
+          "PluginListenerHandle"
+        ],
+        "slug": "addlistenercalldisconnected-"
+      },
+      {
+        "name": "addListener",
+        "signature": "(eventName: 'callRinging', listenerFunc: (data: { callSid: string; }) => void) => Promise<PluginListenerHandle>",
+        "parameters": [
+          {
+            "name": "eventName",
+            "docs": "- The event name ('callRinging')",
+            "type": "'callRinging'"
+          },
+          {
+            "name": "listenerFunc",
+            "docs": "- Callback function to handle the event",
+            "type": "(data: { callSid: string; }) => void"
+          }
+        ],
+        "returns": "Promise<PluginListenerHandle>",
+        "tags": [
+          {
+            "name": "param",
+            "text": "eventName - The event name ('callRinging')"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc - Callback function to handle the event"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc.data - Event data"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc.data.callSid - Unique identifier for the ringing call"
+          },
+          {
+            "name": "returns",
+            "text": "Promise that resolves with a listener handle for removing the listener"
+          },
+          {
+            "name": "example",
+            "text": "```typescript\nawait CapacitorTwilioVoice.addListener('callRinging', (data) => {\n  console.log('Call is ringing:', data.callSid);\n  // Play ringing sound, update UI, etc.\n});\n```"
+          }
+        ],
+        "docs": "Listen for call ringing events.\n\nThis event is fired when an outgoing call starts ringing on the other end.",
+        "complexTypes": [
+          "PluginListenerHandle"
+        ],
+        "slug": "addlistenercallringing-"
+      },
+      {
+        "name": "addListener",
+        "signature": "(eventName: 'callReconnecting', listenerFunc: (data: { callSid: string; error?: string; }) => void) => Promise<PluginListenerHandle>",
+        "parameters": [
+          {
+            "name": "eventName",
+            "docs": "- The event name ('callReconnecting')",
+            "type": "'callReconnecting'"
+          },
+          {
+            "name": "listenerFunc",
+            "docs": "- Callback function to handle the event",
+            "type": "(data: { callSid: string; error?: string | undefined; }) => void"
+          }
+        ],
+        "returns": "Promise<PluginListenerHandle>",
+        "tags": [
+          {
+            "name": "param",
+            "text": "eventName - The event name ('callReconnecting')"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc - Callback function to handle the event"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc.data - Event data"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc.data.callSid - Unique identifier for the reconnecting call"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc.data.error - Error message describing the connection issue (optional)"
+          },
+          {
+            "name": "returns",
+            "text": "Promise that resolves with a listener handle for removing the listener"
+          },
+          {
+            "name": "example",
+            "text": "```typescript\nawait CapacitorTwilioVoice.addListener('callReconnecting', (data) => {\n  console.log('Call reconnecting:', data.callSid);\n  if (data.error) {\n    console.log('Reconnection reason:', data.error);\n  }\n  // Show reconnecting indicator in UI\n});\n```"
+          }
+        ],
+        "docs": "Listen for call reconnecting events.\n\nThis event is fired when a call loses connection and Twilio is attempting to\nreconnect. The call is not disconnected yet but audio may be interrupted.",
+        "complexTypes": [
+          "PluginListenerHandle"
+        ],
+        "slug": "addlistenercallreconnecting-"
+      },
+      {
+        "name": "addListener",
+        "signature": "(eventName: 'callReconnected', listenerFunc: (data: { callSid: string; }) => void) => Promise<PluginListenerHandle>",
+        "parameters": [
+          {
+            "name": "eventName",
+            "docs": "- The event name ('callReconnected')",
+            "type": "'callReconnected'"
+          },
+          {
+            "name": "listenerFunc",
+            "docs": "- Callback function to handle the event",
+            "type": "(data: { callSid: string; }) => void"
+          }
+        ],
+        "returns": "Promise<PluginListenerHandle>",
+        "tags": [
+          {
+            "name": "param",
+            "text": "eventName - The event name ('callReconnected')"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc - Callback function to handle the event"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc.data - Event data"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc.data.callSid - Unique identifier for the reconnected call"
+          },
+          {
+            "name": "returns",
+            "text": "Promise that resolves with a listener handle for removing the listener"
+          },
+          {
+            "name": "example",
+            "text": "```typescript\nawait CapacitorTwilioVoice.addListener('callReconnected', (data) => {\n  console.log('Call reconnected:', data.callSid);\n  // Hide reconnecting indicator, resume normal UI\n});\n```"
+          }
+        ],
+        "docs": "Listen for call reconnected events.\n\nThis event is fired when a call successfully reconnects after a connection loss.\nAudio should resume normally after this event.",
+        "complexTypes": [
+          "PluginListenerHandle"
+        ],
+        "slug": "addlistenercallreconnected-"
+      },
+      {
+        "name": "addListener",
+        "signature": "(eventName: 'callQualityWarningsChanged', listenerFunc: (data: { callSid: string; currentWarnings: string[]; previousWarnings: string[]; }) => void) => Promise<PluginListenerHandle>",
+        "parameters": [
+          {
+            "name": "eventName",
+            "docs": "- The event name ('callQualityWarningsChanged')",
+            "type": "'callQualityWarningsChanged'"
+          },
+          {
+            "name": "listenerFunc",
+            "docs": "- Callback function to handle the event",
+            "type": "(data: { callSid: string; currentWarnings: string[]; previousWarnings: string[]; }) => void"
+          }
+        ],
+        "returns": "Promise<PluginListenerHandle>",
+        "tags": [
+          {
+            "name": "param",
+            "text": "eventName - The event name ('callQualityWarningsChanged')"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc - Callback function to handle the event"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc.data - Event data"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc.data.callSid - Unique identifier for the call"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc.data.currentWarnings - Array of current quality warnings"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc.data.previousWarnings - Array of previous quality warnings"
+          },
+          {
+            "name": "returns",
+            "text": "Promise that resolves with a listener handle for removing the listener"
+          },
+          {
+            "name": "example",
+            "text": "```typescript\nawait CapacitorTwilioVoice.addListener('callQualityWarningsChanged', (data) => {\n  console.log('Call quality warnings:', data.currentWarnings);\n\n  if (data.currentWarnings.includes('high-jitter')) {\n    console.warn('Network jitter detected');\n  }\n  if (data.currentWarnings.includes('high-packet-loss')) {\n    console.warn('Packet loss detected');\n  }\n});\n```"
+          }
+        ],
+        "docs": "Listen for call quality warning events.\n\nThis event is fired when the call quality changes, providing warnings about\npotential issues like high jitter, packet loss, or low audio levels.",
+        "complexTypes": [
+          "PluginListenerHandle"
+        ],
+        "slug": "addlistenercallqualitywarningschanged-"
+      },
+      {
+        "name": "addListener",
+        "signature": "(eventName: 'registrationSuccess', listenerFunc: () => void) => Promise<PluginListenerHandle>",
+        "parameters": [
+          {
+            "name": "eventName",
+            "docs": "- The event name ('registrationSuccess')",
+            "type": "'registrationSuccess'"
+          },
+          {
+            "name": "listenerFunc",
+            "docs": "- Callback function to handle the event",
+            "type": "() => void"
+          }
+        ],
+        "returns": "Promise<PluginListenerHandle>",
+        "tags": [
+          {
+            "name": "param",
+            "text": "eventName - The event name ('registrationSuccess')"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc - Callback function to handle the event"
+          },
+          {
+            "name": "returns",
+            "text": "Promise that resolves with a listener handle for removing the listener"
+          },
+          {
+            "name": "example",
+            "text": "```typescript\nawait CapacitorTwilioVoice.addListener('registrationSuccess', () => {\n  console.log('Successfully registered with Twilio Voice');\n  // Update UI to show ready state\n});\n```"
+          }
+        ],
+        "docs": "Listen for successful registration events.\n\nThis event is fired when the device successfully registers with Twilio Voice\nand is ready to make and receive calls. This typically occurs after a successful\nlogin with a valid access token.",
+        "complexTypes": [
+          "PluginListenerHandle"
+        ],
+        "slug": "addlistenerregistrationsuccess-"
+      },
+      {
+        "name": "addListener",
+        "signature": "(eventName: 'registrationFailure', listenerFunc: (data: { error: string; }) => void) => Promise<PluginListenerHandle>",
+        "parameters": [
+          {
+            "name": "eventName",
+            "docs": "- The event name ('registrationFailure')",
+            "type": "'registrationFailure'"
+          },
+          {
+            "name": "listenerFunc",
+            "docs": "- Callback function to handle the event",
+            "type": "(data: { error: string; }) => void"
+          }
+        ],
+        "returns": "Promise<PluginListenerHandle>",
+        "tags": [
+          {
+            "name": "param",
+            "text": "eventName - The event name ('registrationFailure')"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc - Callback function to handle the event"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc.data - Event data"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc.data.error - Error message describing the registration failure"
+          },
+          {
+            "name": "returns",
+            "text": "Promise that resolves with a listener handle for removing the listener"
+          },
+          {
+            "name": "example",
+            "text": "```typescript\nawait CapacitorTwilioVoice.addListener('registrationFailure', (data) => {\n  console.error('Registration failed:', data.error);\n  // Re-authenticate user or show error message\n});\n```"
+          }
+        ],
+        "docs": "Listen for registration failure events.\n\nThis event is fired when the device fails to register with Twilio Voice,\ntypically due to an invalid or expired access token, network issues, or\nTwilio service problems.",
+        "complexTypes": [
+          "PluginListenerHandle"
+        ],
+        "slug": "addlistenerregistrationfailure-"
+      },
+      {
+        "name": "addListener",
+        "signature": "(eventName: 'audioDevicesChanged', listenerFunc: (data: { inputs: AudioDevice[]; outputs: AudioDevice[]; }) => void) => Promise<PluginListenerHandle>",
+        "parameters": [
+          {
+            "name": "eventName",
+            "docs": "- The event name ('audioDevicesChanged')",
+            "type": "'audioDevicesChanged'"
+          },
+          {
+            "name": "listenerFunc",
+            "docs": "- Callback function to handle the event",
+            "type": "(data: { inputs: AudioDevice[]; outputs: AudioDevice[]; }) => void"
+          }
+        ],
+        "returns": "Promise<PluginListenerHandle>",
+        "tags": [
+          {
+            "name": "param",
+            "text": "eventName - The event name ('audioDevicesChanged')"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc - Callback function to handle the event"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc.data - Event data with updated device lists"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc.data.inputs - Updated array of available input (microphone) devices"
+          },
+          {
+            "name": "param",
+            "text": "listenerFunc.data.outputs - Updated array of available output (speaker) devices"
+          },
+          {
+            "name": "returns",
+            "text": "Promise that resolves with a listener handle for removing the listener"
+          },
+          {
+            "name": "example",
+            "text": "```typescript\nawait CapacitorTwilioVoice.addListener('audioDevicesChanged', (data) => {\n  console.log('Audio devices changed');\n  console.log('Microphones:', data.inputs.map(d => d.label));\n  console.log('Speakers:', data.outputs.map(d => d.label));\n  // Update device selection UI\n});\n```"
+          }
+        ],
+        "docs": "Listen for audio device changes.\n\nThis event is fired when audio input/output devices are added or removed\nfrom the system (e.g., plugging in headphones, connecting Bluetooth).\nWeb/Electron only — this event is never fired on iOS/Android.",
+        "complexTypes": [
+          "PluginListenerHandle",
+          "AudioDevice"
+        ],
+        "slug": "addlisteneraudiodeviceschanged-"
+      },
+      {
+        "name": "removeAllListeners",
+        "signature": "() => Promise<void>",
+        "parameters": [],
+        "returns": "Promise<void>",
+        "tags": [
+          {
+            "name": "returns",
+            "text": "Promise that resolves when all listeners have been removed"
+          },
+          {
+            "name": "example",
+            "text": "```typescript\n// In a React component cleanup\nuseEffect(() => {\n  // Setup listeners...\n\n  return () => {\n    CapacitorTwilioVoice.removeAllListeners();\n  };\n}, []);\n```"
+          }
+        ],
+        "docs": "Remove all registered event listeners.\n\nThis is useful for cleanup when your component unmounts or when you want to\nreset all event handling.",
+        "complexTypes": [],
+        "slug": "removealllisteners"
+      },
+      {
+        "name": "getPluginVersion",
+        "signature": "() => Promise<{ version: string; }>",
+        "parameters": [],
+        "returns": "Promise<{ version: string; }>",
+        "tags": [
+          {
+            "name": "returns",
+            "text": "a Promise with version for this plugin"
+          },
+          {
+            "name": "throws",
+            "text": "An error if something went wrong"
+          }
+        ],
+        "docs": "Get the native Capacitor plugin version",
+        "complexTypes": [],
+        "slug": "getpluginversion"
+      }
+    ],
+    "properties": []
+  },
+  "interfaces": [
+    {
+      "name": "CallInvite",
+      "slug": "callinvite",
+      "docs": "Represents a pending incoming call invitation.\n\nThis interface describes the data structure for call invitations that have been received\nbut not yet accepted or rejected. The same structure is used both in the\n`callInviteReceived` event and in the `pendingInvites` array returned by `getCallStatus()`.",
+      "tags": [
+        {
+          "text": "```typescript\nCapacitorTwilioVoice.addListener('callInviteReceived', (data: CallInvite) => {\n  console.log('Incoming call from:', data.from);\n  console.log('Call SID:', data.callSid);\n  console.log('To:', data.to);\n  console.log('Custom params:', data.customParams);\n});\n\nconst status = await CapacitorTwilioVoice.getCallStatus();\nstatus.pendingInvites.forEach((invite: CallInvite) => {\n  console.log('Pending call from:', invite.from);\n});\n```",
+          "name": "example"
+        }
+      ],
+      "methods": [],
+      "properties": [
+        {
+          "name": "callSid",
+          "tags": [],
+          "docs": "Unique identifier for the incoming call invitation",
+          "complexTypes": [],
+          "type": "string"
+        },
+        {
+          "name": "from",
+          "tags": [],
+          "docs": "Phone number or client identifier of the caller (may include custom caller name)",
+          "complexTypes": [],
+          "type": "string"
+        },
+        {
+          "name": "to",
+          "tags": [],
+          "docs": "Phone number or client identifier being called",
+          "complexTypes": [],
+          "type": "string"
+        },
+        {
+          "name": "customParams",
+          "tags": [],
+          "docs": "Custom parameters passed with the call invitation",
+          "complexTypes": [
+            "Record"
+          ],
+          "type": "Record<string, string>"
+        }
+      ]
+    },
+    {
+      "name": "AudioDevice",
+      "slug": "audiodevice",
+      "docs": "Represents an audio device (microphone or speaker) available for use.\n\nThis interface is used by the web implementation to enumerate and select\nspecific audio input/output devices. On iOS and Android, audio routing is\nhandled by the OS (earpiece/speaker toggle, Bluetooth).",
+      "tags": [
+        {
+          "text": "```typescript\nconst { inputs, outputs } = await CapacitorTwilioVoice.getAudioDevices();\nconsole.log('Microphones:', inputs.map(d => d.label));\nconsole.log('Speakers:', outputs.map(d => d.label));\n\n// Select a specific microphone\nawait CapacitorTwilioVoice.setInputDevice({ deviceId: inputs[1].deviceId });\n\n// Select a specific speaker\nawait CapacitorTwilioVoice.setOutputDevice({ deviceId: outputs[1].deviceId });\n```",
+          "name": "example"
+        }
+      ],
+      "methods": [],
+      "properties": [
+        {
+          "name": "deviceId",
+          "tags": [],
+          "docs": "Browser-assigned unique identifier for this device",
+          "complexTypes": [],
+          "type": "string"
+        },
+        {
+          "name": "label",
+          "tags": [],
+          "docs": "Human-readable label (e.g., \"Built-in Microphone\", \"AirPods Pro\")",
+          "complexTypes": [],
+          "type": "string"
+        },
+        {
+          "name": "kind",
+          "tags": [],
+          "docs": "Whether this is an input (microphone) or output (speaker) device",
+          "complexTypes": [],
+          "type": "'audioinput' | 'audiooutput'"
+        }
+      ]
+    },
+    {
+      "name": "PluginListenerHandle",
+      "slug": "pluginlistenerhandle",
+      "docs": "",
+      "tags": [],
+      "methods": [],
+      "properties": [
+        {
+          "name": "remove",
+          "tags": [],
+          "docs": "",
+          "complexTypes": [],
+          "type": "() => Promise<void>"
+        }
+      ]
+    }
+  ],
+  "enums": [],
+  "typeAliases": [
+    {
+      "name": "Record",
+      "slug": "record",
+      "docs": "Construct a type with a set of properties K of type T",
+      "types": [
+        {
+          "text": "{\r\n    [P in K]: T;\r\n}",
+          "complexTypes": [
+            "K",
+            "T"
+          ]
+        }
+      ]
+    }
+  ],
+  "pluginConfigs": []
+}
