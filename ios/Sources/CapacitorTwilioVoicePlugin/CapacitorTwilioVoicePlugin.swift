@@ -46,7 +46,10 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
         CAPPluginMethod(name: "getCallStatus", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "checkMicrophonePermission", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "requestMicrophonePermission", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "getPluginVersion", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "getPluginVersion", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getAudioDevices", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setInputDevice", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setOutputDevice", returnType: CAPPluginReturnPromise)
     ]
 
     // MARK: - Properties
@@ -1298,6 +1301,24 @@ extension CapacitorTwilioVoicePlugin: AVAudioPlayerDelegate {
 
     @objc func getPluginVersion(_ call: CAPPluginCall) {
         call.resolve(["version": self.pluginVersion])
+    }
+
+    // MARK: - Audio Device Selection (Web-only, stubs for native)
+
+    @objc func getAudioDevices(_ call: CAPPluginCall) {
+        // Audio device selection is only supported on web platform.
+        // On iOS, the system manages audio routing automatically.
+        call.resolve(["devices": []])
+    }
+
+    @objc func setInputDevice(_ call: CAPPluginCall) {
+        // Audio device selection is only supported on web platform.
+        call.resolve(["success": true])
+    }
+
+    @objc func setOutputDevice(_ call: CAPPluginCall) {
+        // Audio device selection is only supported on web platform.
+        call.resolve(["success": true])
     }
 
 }

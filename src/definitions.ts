@@ -177,7 +177,7 @@ export interface CapacitorTwilioVoicePlugin {
    * });
    * ```
    */
-  makeCall(options: { to: string }): Promise<{ success: boolean; callSid?: string }>;
+  makeCall(options: { to: string; params?: Record<string, string> }): Promise<{ success: boolean; callSid?: string }>;
 
   /**
    * Accept an incoming call.

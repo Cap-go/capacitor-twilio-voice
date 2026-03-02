@@ -74,14 +74,11 @@
     "twilio-cli": "^6.1.0",
     "typescript": "^5.9.3"
   },
-  "peerDependencies": {
-    "@capacitor/core": ">=8.0.0",
+  "dependencies": {
     "@twilio/voice-sdk": "^2.18.0"
   },
-  "peerDependenciesMeta": {
-    "@twilio/voice-sdk": {
-      "optional": true
-    }
+  "peerDependencies": {
+    "@capacitor/core": ">=8.0.0"
   },
   "prettier": "@ionic/prettier-config",
   "swiftlint": "@ionic/swiftlint-config",

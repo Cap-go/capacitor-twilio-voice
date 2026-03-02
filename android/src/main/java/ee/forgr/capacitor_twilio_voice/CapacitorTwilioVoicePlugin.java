@@ -1860,4 +1860,30 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             call.reject("Could not get plugin version", e);
         }
     }
+
+    // Audio Device Selection (Web-only, stubs for native)
+
+    @PluginMethod
+    public void getAudioDevices(final PluginCall call) {
+        // Audio device selection is only supported on web platform.
+        // On Android, the system manages audio routing automatically.
+        final JSObject ret = new JSObject();
+        ret.put("devices", new com.getcapacitor.JSArray());
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void setInputDevice(final PluginCall call) {
+        // Audio device selection is only supported on web platform.
+        final JSObject ret = new JSObject();
+        ret.put("success", true);
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void setOutputDevice(final PluginCall call) {
+        // Audio device selection is only supported on web platform.
+        final JSObject ret = new JSObject();
+        ret.put("success", true);
+        call.resolve(ret);
 }

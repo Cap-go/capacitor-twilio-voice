@@ -107,7 +107,7 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
 
   // ─── Call Management ───────────────────────────────────────────────
 
-  async makeCall(options: { to: string }): Promise<{ success: boolean; callSid?: string }> {
+  async makeCall(options: { to: string; params?: Record<string, string> }): Promise<{ success: boolean; callSid?: string }> {
     if (!this.device || this.device.state !== Device.State.Registered) {
       this.notifyListeners('outgoingCallFailed', {
         callSid: '',
@@ -129,8 +129,13 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
     }
 
     try {
+      const connectParams: Record<string, string> = { To: options.to };
+      // Pass custom params (displayName, wardName, accessId, etc.) through to Twilio
+      if (options.params) {
+        Object.assign(connectParams, options.params);
+      }
       const call = await this.device.connect({
-        params: { To: options.to },
+        params: connectParams,
       });
 
       const callSid = call.parameters?.CallSid || `web-${Date.now()}`;
@@ -143,11 +148,13 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
       this.activeCall = call;
 
       // Emit outgoingCallInitiated
-      this.notifyListeners('outgoingCallInitiated', {
+      const outgoingData = {
         callSid,
         to: options.to,
         source: 'app' as const,
-      });
+      };
+      this.notifyListeners('outgoingCallInitiated', outgoingData);
+      this.dispatchFallbackEvent('outgoingCallInitiated', outgoingData);
 
       return { success: true, callSid };
     } catch {
@@ -186,10 +193,12 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
 
     // Remove from pending and emit cancellation
     this.pendingInvites.delete(options.callSid);
-    this.notifyListeners('callInviteCancelled', {
+    const rejectData = {
       callSid: options.callSid,
       reason: 'user_declined' as const,
-    });
+    };
+    this.notifyListeners('callInviteCancelled', rejectData);
+    this.dispatchFallbackEvent('callInviteCancelled', rejectData);
 
     return { success: true };
   }
@@ -383,6 +392,7 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
   // ─── Private: Event Wiring ─────────────────────────────────────────
 
   private wireDeviceEvents(device: Device): void {
+    console.log('[CapacitorTwilioVoiceWeb] wireDeviceEvents called — registering incoming/registered/error listeners');
     // Registration success
     device.on('registered', () => {
       this.notifyListeners('registrationSuccess', {});
@@ -398,6 +408,7 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
 
     // Incoming call
     device.on('incoming', (call: Call) => {
+      console.log(`[CapacitorTwilioVoiceWeb] 📞 Incoming call handler fired, callSid: ${call.parameters?.CallSid}, from: ${call.parameters?.From}`);
       const callSid = call.parameters?.CallSid || `incoming-${Date.now()}`;
 
       // Wire call events
@@ -409,15 +420,32 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
       // Extract caller info
       const from = call.parameters?.From || '';
       const to = call.parameters?.To || '';
-      const customParams = this.callCustomParamsToRecord(call.customParameters);
+      let customParams = this.callCustomParamsToRecord(call.customParameters);
 
-      // Emit callInviteReceived
-      this.notifyListeners('callInviteReceived', {
+      // On web, Twilio puts custom TwiML params in parameters.Params as a
+      // URL-encoded string (e.g. "displayName=%2B47...&CapacitorTwilioCallerName=...").
+      // The native iOS/Android SDK parses these into customParameters automatically,
+      // but the JS SDK does not — we parse them here for parity.
+      if (call.parameters?.Params && Object.keys(customParams).length === 0) {
+        try {
+          const parsed = new URLSearchParams(call.parameters.Params);
+          parsed.forEach((value, key) => {
+            customParams[key] = value;
+          });
+        } catch {
+          // Ignore parse errors — fall through with empty customParams
+        }
+      }
+
+      // Emit callInviteReceived via Capacitor event system + window fallback
+      const payload = {
         callSid,
         from,
         to,
         customParams,
-      });
+      };
+      this.notifyListeners('callInviteReceived', payload);
+      this.dispatchFallbackEvent('callInviteReceived', payload);
     });
 
     // Listen for device audio changes
@@ -431,51 +459,60 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
   private wireCallEvents(call: Call, callSid: string): void {
     // Call accepted/connected
     call.on('accept', () => {
-      this.notifyListeners('callConnected', { callSid });
+      console.log(`[CapacitorTwilioVoiceWeb] Call 'accept' event fired for ${callSid}`);
+      const data = { callSid };
+      this.notifyListeners('callConnected', data);
+      this.dispatchFallbackEvent('callConnected', data);
     });
 
     // Call disconnected
     call.on('disconnect', () => {
+      console.log(`[CapacitorTwilioVoiceWeb] Call 'disconnect' event fired for ${callSid}`);
       this.handleCallDisconnected(callSid);
     });
 
     // Call ringing (outgoing)
     call.on('ringing', () => {
-      this.notifyListeners('callRinging', { callSid });
+      console.log(`[CapacitorTwilioVoiceWeb] Call 'ringing' event fired for ${callSid}`);
+      const data = { callSid };
+      this.notifyListeners('callRinging', data);
+      this.dispatchFallbackEvent('callRinging', data);
     });
 
     // Reconnecting
     call.on('reconnecting', (error: unknown) => {
       const message = error instanceof Error ? error.message : undefined;
-      this.notifyListeners('callReconnecting', {
-        callSid,
-        error: message,
-      });
+      const data = { callSid, error: message };
+      this.notifyListeners('callReconnecting', data);
+      this.dispatchFallbackEvent('callReconnecting', data);
     });
 
     // Reconnected
     call.on('reconnected', () => {
-      this.notifyListeners('callReconnected', { callSid });
+      const data = { callSid };
+      this.notifyListeners('callReconnected', data);
+      this.dispatchFallbackEvent('callReconnected', data);
     });
 
     // Cancel (incoming call cancelled by caller)
     call.on('cancel', () => {
       this.pendingInvites.delete(callSid);
-      this.notifyListeners('callInviteCancelled', {
-        callSid,
-        reason: 'remote_cancelled' as const,
-      });
+      const data = { callSid, reason: 'remote_cancelled' as const };
+      this.notifyListeners('callInviteCancelled', data);
+      this.dispatchFallbackEvent('callInviteCancelled', data);
     });
 
     // Error on call
     call.on('error', () => {
       // If this is an outgoing call that hasn't connected, emit outgoingCallFailed
       if (call.direction === 'OUTGOING' && call.status() !== 'open') {
-        this.notifyListeners('outgoingCallFailed', {
+        const data = {
           callSid,
           to: call.parameters?.To || '',
           reason: 'connection_failed' as const,
-        });
+        };
+        this.notifyListeners('outgoingCallFailed', data);
+        this.dispatchFallbackEvent('outgoingCallFailed', data);
       }
     });
 
@@ -534,7 +571,9 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
     }
 
     // Emit event
-    this.notifyListeners('callDisconnected', { callSid });
+    const data = { callSid };
+    this.notifyListeners('callDisconnected', data);
+    this.dispatchFallbackEvent('callDisconnected', data);
   }
 
   // ─── Private: Helpers ──────────────────────────────────────────────
@@ -598,5 +637,18 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
   private async emitAudioDevicesChanged(): Promise<void> {
     const { inputs, outputs } = await this.getAudioDevices();
     this.notifyListeners('audioDevicesChanged', { inputs, outputs });
+  }
+
+  /**
+   * Dispatch a window CustomEvent as a fallback for Capacitor proxy listener
+   * registration bug where only the first addListener call succeeds.
+   * useTwilioVoice.ts listens for these events as a backup delivery path.
+   */
+  private dispatchFallbackEvent(eventName: string, data: any): void {
+    try {
+      window.dispatchEvent(new CustomEvent(`capacitor-twilio-${eventName}`, { detail: data }));
+    } catch (e) {
+      console.warn(`[CapacitorTwilioVoiceWeb] Failed to dispatch fallback event '${eventName}':`, e);
+    }
   }
 }
