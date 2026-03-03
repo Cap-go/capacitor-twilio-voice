@@ -7,7 +7,7 @@
   <h2><a href="https://capgo.app/consulting/?ref=plugin_twilio_voice"> Missing a feature? We’ll build the plugin for you 💪</a></h2>
 </div>
 
-A Capacitor plugin for integrating Twilio Voice calling functionality into iOS and Android applications.
+A Capacitor plugin for integrating Twilio Voice calling functionality into iOS, Android, and Web/Electron applications.
 
 ## Documentation
 
@@ -321,10 +321,69 @@ public class MainActivity extends BridgeActivity {
 
 Keep in mind, this will make it so that you app can be accessed when the screen is locked.
 
+## Web/Electron Setup
+
+The web implementation uses the [Twilio Voice JS SDK](https://www.twilio.com/docs/voice/sdks/javascript) (`@twilio/voice-sdk`) and works in both browsers and Electron.
+
+### 1. Serve over HTTPS
+
+Microphone access (`getUserMedia`) requires a secure context. In development you can use `localhost`; in production your app must be served over HTTPS.
+
+### 2. No native configuration needed
+
+Unlike iOS and Android, the web platform does not require any native project modifications, push notification certificates, or Firebase setup. The plugin registers itself automatically via `registerPlugin` in `src/index.ts`.
+
+### 3. Audio device selection (optional)
+
+The web implementation supports selecting specific microphones and speakers during a call:
+
+```typescript
+// List available devices (requires microphone permission)
+const { inputs, outputs } = await CapacitorTwilioVoice.getAudioDevices();
+
+// Select a specific microphone
+await CapacitorTwilioVoice.setInputDevice({ deviceId: inputs[0].deviceId });
+
+// Select a specific speaker (requires browser setSinkId support)
+await CapacitorTwilioVoice.setOutputDevice({ deviceId: outputs[0].deviceId });
+
+// Listen for device changes (e.g., headphones plugged in)
+CapacitorTwilioVoice.addListener('audioDevicesChanged', (data) => {
+  console.log('Devices changed:', data.inputs, data.outputs);
+});
+```
+
+> **Note:** `getAudioDevices()`, `setInputDevice()`, `setOutputDevice()`, and the `audioDevicesChanged` event are web/Electron only. On iOS and Android they return empty arrays or no-op respectively.
+
+### 4. DTMF tones
+
+Sending DTMF digits is supported on all platforms (iOS, Android, and Web):
+
+```typescript
+// Send digits during an active call
+await CapacitorTwilioVoice.sendDigits({ digits: '1234' });
+
+// Send digits with pauses (w = 0.5s pause)
+await CapacitorTwilioVoice.sendDigits({ digits: '1w2w3' });
+```
+
+Valid characters: `0-9`, `*`, `#`, and `w` (0.5 second pause).
+
+### Platform differences
+
+| Feature | iOS | Android | Web/Electron |
+|---------|-----|---------|--------------|
+| Incoming calls (push) | VoIP push (PushKit) | FCM push | Twilio JS SDK `incoming` event |
+| CallKit / Telecom integration | ✅ | ✅ | N/A |
+| Audio device selection | OS-managed | OS-managed | Programmatic (`getAudioDevices`, `setInputDevice`, `setOutputDevice`) |
+| DTMF (`sendDigits`) | ✅ | ✅ | ✅ |
+| Speaker toggle | Hardware routing | AudioSwitch | `setSinkId` API (best-effort) |
+
 ## Twilio Setup
 
 - [iOS Setup](https://www.twilio.com/docs/voice/sdks/ios/get-started)
 - [Android Setup](https://www.twilio.com/docs/voice/sdks/android/get-started)
+- [Web/JavaScript Setup](https://www.twilio.com/docs/voice/sdks/javascript/get-started)
 
 ## Caller Name Display (CapacitorTwilioCallerName)
 
@@ -539,6 +598,14 @@ async function fetchAccessToken(identity: string): Promise<string> {
 - Requires Google Play Services
 - Firebase messaging works in Android Emulator with Google APIs
 
+### Web/Electron
+
+- Works in modern browsers (Chrome, Edge, Firefox, Safari 14.1+)
+- Microphone access requires HTTPS or `localhost`
+- Audio device selection (`setInputDevice`/`setOutputDevice`) requires browser support for `setSinkId`
+- No push notifications — incoming calls are delivered via the Twilio JS SDK's `incoming` event while the page is open
+- DTMF tones (`sendDigits`) work on all platforms including web
+
 ## Error Handling
 
 The plugin provides detailed error information:
@@ -571,7 +638,7 @@ Common error scenarios:
 |----------|---------|-------|
 | iOS      | ✅      | Requires iOS 13.0+ |
 | Android  | ✅      | Requires API level 23+ |
-| Web      | ❌      | Not supported |
+| Web      | ✅      | Supports browser and Electron. Audio device selection (microphone/speaker) supported. |
 
 ## API
 
@@ -668,7 +735,7 @@ Check if the user is currently logged in and has a valid access token.
 ### makeCall(...)
 
 ```typescript
-makeCall(options: { to: string; }) => Promise<{ success: boolean; callSid?: string; }>
+makeCall(options: { to: string; params?: Record<string, string>; }) => Promise<{ success: boolean; callSid?: string; }>
 ```
 
 Initiate an outgoing call to a phone number or client.
@@ -676,9 +743,9 @@ Initiate an outgoing call to a phone number or client.
 The user must be logged in before making a call. The call will be routed
 through your Twilio backend configuration.
 
-| Param         | Type                         | Description            |
-| ------------- | ---------------------------- | ---------------------- |
-| **`options`** | <code>{ to: string; }</code> | - Configuration object |
+| Param         | Type                                                                                      | Description            |
+| ------------- | ----------------------------------------------------------------------------------------- | ---------------------- |
+| **`options`** | <code>{ to: string; params?: <a href="#record">Record</a>&lt;string, string&gt;; }</code> | - Configuration object |
 
 **Returns:** <code>Promise&lt;{ success: boolean; callSid?: string; }&gt;</code>
 
@@ -1256,6 +1323,8 @@ handled by the OS (earpiece/speaker toggle, Bluetooth).
 
 Construct a type with a set of properties K of type T
 
-<code>{ [P in K]: T; }</code>
+<code>{
+ [P in K]: T;
+ }</code>
 
 </docgen-api>

@@ -37,7 +37,7 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
 
     // Create new Device
     this.device = new Device(options.accessToken, {
-      logLevel: 1,
+      logLevel: 3,
       codecPreferences: [Call.Codec.Opus, Call.Codec.PCMU],
       closeProtection: true,
       allowIncomingWhileBusy: true,
@@ -392,7 +392,6 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
   // ─── Private: Event Wiring ─────────────────────────────────────────
 
   private wireDeviceEvents(device: Device): void {
-    console.log('[CapacitorTwilioVoiceWeb] wireDeviceEvents called — registering incoming/registered/error listeners');
     // Registration success
     device.on('registered', () => {
       this.notifyListeners('registrationSuccess', {});
@@ -408,7 +407,6 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
 
     // Incoming call
     device.on('incoming', (call: Call) => {
-      console.log(`[CapacitorTwilioVoiceWeb] 📞 Incoming call handler fired, callSid: ${call.parameters?.CallSid}, from: ${call.parameters?.From}`);
       const callSid = call.parameters?.CallSid || `incoming-${Date.now()}`;
 
       // Wire call events
@@ -459,7 +457,6 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
   private wireCallEvents(call: Call, callSid: string): void {
     // Call accepted/connected
     call.on('accept', () => {
-      console.log(`[CapacitorTwilioVoiceWeb] Call 'accept' event fired for ${callSid}`);
       const data = { callSid };
       this.notifyListeners('callConnected', data);
       this.dispatchFallbackEvent('callConnected', data);
@@ -467,13 +464,11 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
 
     // Call disconnected
     call.on('disconnect', () => {
-      console.log(`[CapacitorTwilioVoiceWeb] Call 'disconnect' event fired for ${callSid}`);
       this.handleCallDisconnected(callSid);
     });
 
     // Call ringing (outgoing)
     call.on('ringing', () => {
-      console.log(`[CapacitorTwilioVoiceWeb] Call 'ringing' event fired for ${callSid}`);
       const data = { callSid };
       this.notifyListeners('callRinging', data);
       this.dispatchFallbackEvent('callRinging', data);
