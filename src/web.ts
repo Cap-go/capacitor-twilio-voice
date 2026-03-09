@@ -218,16 +218,71 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
       return { success: false };
     }
 
-    // Workaround: Twilio SDK disconnect() silently fails when transport is dead
-    // (error 31009), and stale PeerConnection callbacks cause ICE-restart crashes.
-    // We force-close the internal _mediaHandler to kill the RTCPeerConnection.
-    call.removeAllListeners();
-    try { call.disconnect(); } catch { /* transport may be dead */ }
-    try {
-      const mh = (call as any)._mediaHandler;
-      if (mh?.close) mh.close();
-    } catch { /* internal API — best effort */ }
+    // Aggressive cleanup to break the ICE restart loop.
+    //
+    // The Twilio SDK has an internal loop that we must break at multiple points:
+    //   pc.onicegatheringstatechange → _onIceGatheringFailure → _onMediaFailure
+    //   → _mediaReconnectBackoff.backoff() → (timer) → _mediaHandler.iceRestart()
+    //   → createOffer → reinvite → PStream._publish → TransportError 31009 → loop
+    //
+    // call.removeAllListeners() only removes EventEmitter listeners on the Call
+    // object — it does NOT stop the backoff timer or the direct PeerConnection
+    // callbacks that drive this loop.
 
+    const c = call as any;
+
+    // 1. Stop the backoff timer and remove its 'ready' listener that triggers iceRestart
+    try {
+      if (c._mediaReconnectBackoff) {
+        c._mediaReconnectBackoff.reset();
+        c._mediaReconnectBackoff.removeAllListeners();
+      }
+    } catch { /* best effort */ }
+
+    // 2. Null out the _mediaHandler callbacks so PeerConnection events can't
+    //    re-trigger _onMediaFailure. These are direct property assignments (not
+    //    EventEmitter), so removeAllListeners() doesn't touch them.
+    try {
+      const mh = c._mediaHandler;
+      if (mh) {
+        const noop = () => {};
+        mh.onicegatheringfailure = noop;
+        mh.onicegatheringstatechange = noop;
+        mh.ondisconnected = noop;
+        mh.onfailed = noop;
+        mh.onconnected = noop;
+        mh.onreconnected = noop;
+        mh.onerror = noop;
+        mh.onclose = noop;
+        mh.onopen = noop;
+      }
+    } catch { /* best effort */ }
+
+    // 3. Close the PeerConnection directly to stop all ICE activity.
+    //    mh.close() calls version.pc.close() and sets pc = null, which prevents
+    //    any in-flight createOffer from succeeding.
+    try {
+      const mh = c._mediaHandler;
+      if (mh) {
+        // Also null out the raw RTCPeerConnection event handler
+        if (mh.version?.pc) {
+          mh.version.pc.onicegatheringstatechange = null;
+          mh.version.pc.oniceconnectionstatechange = null;
+          mh.version.pc.onconnectionstatechange = null;
+          mh.version.pc.onicecandidate = null;
+        }
+        mh.close();
+      }
+    } catch { /* best effort */ }
+
+    // 4. Remove EventEmitter listeners and clean up pstream listeners
+    try { call.removeAllListeners(); } catch { /* best effort */ }
+    try { if (c._cleanupEventListeners) c._cleanupEventListeners(); } catch { /* best effort */ }
+
+    // 5. Try the normal disconnect (may fail if transport is dead — that's OK)
+    try { call.disconnect(); } catch { /* transport may be dead */ }
+
+    // 6. Emit the disconnected event so the app UI updates
     if (resolvedCallSid) {
       this.handleCallDisconnected(resolvedCallSid);
     }
