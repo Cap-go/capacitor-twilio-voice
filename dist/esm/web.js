@@ -173,16 +173,27 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin {
     }
     async endCall(options) {
         let call;
+        let resolvedCallSid;
         if (options.callSid) {
             call = this.activeCalls.get(options.callSid) || this.pendingInvites.get(options.callSid);
+            resolvedCallSid = options.callSid;
         }
         else {
             call = this.activeCall || undefined;
+            resolvedCallSid = call ? this.getCallSid(call) : undefined;
         }
         if (!call) {
             return { success: false };
         }
+        // Remove all listeners before disconnecting to prevent the Twilio SDK's
+        // internal ICE restart from racing with PeerConnection teardown
+        // (causes "Cannot read properties of null (reading 'createOffer')").
+        call.removeAllListeners();
         call.disconnect();
+        // Trigger cleanup manually since we removed the 'disconnect' listener above
+        if (resolvedCallSid) {
+            this.handleCallDisconnected(resolvedCallSid);
+        }
         return { success: true };
     }
     // ─── Call Controls ─────────────────────────────────────────────────
