@@ -185,12 +185,20 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin {
         if (!call) {
             return { success: false };
         }
-        // Remove all listeners before disconnecting to prevent the Twilio SDK's
-        // internal ICE restart from racing with PeerConnection teardown
-        // (causes "Cannot read properties of null (reading 'createOffer')").
+        // Workaround: Twilio SDK disconnect() silently fails when transport is dead
+        // (error 31009), and stale PeerConnection callbacks cause ICE-restart crashes.
+        // We force-close the internal _mediaHandler to kill the RTCPeerConnection.
         call.removeAllListeners();
-        call.disconnect();
-        // Trigger cleanup manually since we removed the 'disconnect' listener above
+        try {
+            call.disconnect();
+        }
+        catch ( /* transport may be dead */_a) { /* transport may be dead */ }
+        try {
+            const mh = call._mediaHandler;
+            if (mh === null || mh === void 0 ? void 0 : mh.close)
+                mh.close();
+        }
+        catch ( /* internal API — best effort */_b) { /* internal API — best effort */ }
         if (resolvedCallSid) {
             this.handleCallDisconnected(resolvedCallSid);
         }
