@@ -17,9 +17,13 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
   // Audio device state
   private selectedOutputDeviceId: string | null = null;
 
+  private static readonly PLUGIN_BUILD = 'web-8.0.17-build.4';
+
   // ─── Authentication ────────────────────────────────────────────────
 
   async login(options: { accessToken: string }): Promise<{ success: boolean }> {
+    console.log(`[TwilioVoiceWeb] Plugin build: ${CapacitorTwilioVoiceWeb.PLUGIN_BUILD}`);
+
     if (this.isTokenExpired(options.accessToken)) {
       throw new Error('Access token is expired');
     }
@@ -218,75 +222,7 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
       return { success: false };
     }
 
-    // Aggressive cleanup to break the ICE restart loop.
-    //
-    // The Twilio SDK has an internal loop that we must break at multiple points:
-    //   pc.onicegatheringstatechange → _onIceGatheringFailure → _onMediaFailure
-    //   → _mediaReconnectBackoff.backoff() → (timer) → _mediaHandler.iceRestart()
-    //   → createOffer → reinvite → PStream._publish → TransportError 31009 → loop
-    //
-    // call.removeAllListeners() only removes EventEmitter listeners on the Call
-    // object — it does NOT stop the backoff timer or the direct PeerConnection
-    // callbacks that drive this loop.
-
-    const c = call as any;
-
-    // 1. Stop the backoff timer and remove its 'ready' listener that triggers iceRestart
-    try {
-      if (c._mediaReconnectBackoff) {
-        c._mediaReconnectBackoff.reset();
-        c._mediaReconnectBackoff.removeAllListeners();
-      }
-    } catch { /* best effort */ }
-
-    // 2. Null out the _mediaHandler callbacks so PeerConnection events can't
-    //    re-trigger _onMediaFailure. These are direct property assignments (not
-    //    EventEmitter), so removeAllListeners() doesn't touch them.
-    try {
-      const mh = c._mediaHandler;
-      if (mh) {
-        const noop = () => {};
-        mh.onicegatheringfailure = noop;
-        mh.onicegatheringstatechange = noop;
-        mh.ondisconnected = noop;
-        mh.onfailed = noop;
-        mh.onconnected = noop;
-        mh.onreconnected = noop;
-        mh.onerror = noop;
-        mh.onclose = noop;
-        mh.onopen = noop;
-      }
-    } catch { /* best effort */ }
-
-    // 3. Close the PeerConnection directly to stop all ICE activity.
-    //    mh.close() calls version.pc.close() and sets pc = null, which prevents
-    //    any in-flight createOffer from succeeding.
-    try {
-      const mh = c._mediaHandler;
-      if (mh) {
-        // Also null out the raw RTCPeerConnection event handler
-        if (mh.version?.pc) {
-          mh.version.pc.onicegatheringstatechange = null;
-          mh.version.pc.oniceconnectionstatechange = null;
-          mh.version.pc.onconnectionstatechange = null;
-          mh.version.pc.onicecandidate = null;
-        }
-        mh.close();
-      }
-    } catch { /* best effort */ }
-
-    // 4. Remove EventEmitter listeners and clean up pstream listeners
-    try { call.removeAllListeners(); } catch { /* best effort */ }
-    try { if (c._cleanupEventListeners) c._cleanupEventListeners(); } catch { /* best effort */ }
-
-    // 5. Try the normal disconnect (may fail if transport is dead — that's OK)
-    try { call.disconnect(); } catch { /* transport may be dead */ }
-
-    // 6. Emit the disconnected event so the app UI updates
-    if (resolvedCallSid) {
-      this.handleCallDisconnected(resolvedCallSid);
-    }
-
+    this.forceKillCall(call, resolvedCallSid);
     return { success: true };
   }
 
@@ -457,67 +393,112 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
   // ─── Plugin Version ────────────────────────────────────────────────
 
   async getPluginVersion(): Promise<{ version: string }> {
-    return { version: 'web-8.0.17' };
+    return { version: CapacitorTwilioVoiceWeb.PLUGIN_BUILD };
+  }
+
+  // ─── Private: Call Cleanup ──────────────────────────────────────────
+
+  /**
+   * Aggressively kill a call and break any ICE restart loops.
+   *
+   * The Twilio SDK has an internal loop driven by direct property callbacks
+   * and a backoff timer — not by EventEmitter listeners. This method breaks
+   * the loop at every level:
+   *   1. Reset/remove the backoff timer that schedules iceRestart
+   *   2. Null out _mediaHandler property callbacks (not EventEmitter)
+   *   3. Null out raw RTCPeerConnection event handlers and close the PC
+   *   4. Remove EventEmitter + pstream listeners
+   *   5. Attempt normal disconnect (best-effort)
+   *   6. Emit disconnected event for UI update
+   */
+  private forceKillCall(call: Call, callSid?: string): void {
+    const c = call as any;
+
+    try {
+      if (c._mediaReconnectBackoff) {
+        c._mediaReconnectBackoff.reset();
+        c._mediaReconnectBackoff.removeAllListeners();
+      }
+    } catch { /* best effort */ }
+
+    try {
+      const mh = c._mediaHandler;
+      if (mh) {
+        const noop = () => {};
+        mh.onicegatheringfailure = noop;
+        mh.onicegatheringstatechange = noop;
+        mh.ondisconnected = noop;
+        mh.onfailed = noop;
+        mh.onconnected = noop;
+        mh.onreconnected = noop;
+        mh.onerror = noop;
+        mh.onclose = noop;
+        mh.onopen = noop;
+      }
+    } catch { /* best effort */ }
+
+    try {
+      const mh = c._mediaHandler;
+      if (mh) {
+        if (mh.version?.pc) {
+          mh.version.pc.onicegatheringstatechange = null;
+          mh.version.pc.oniceconnectionstatechange = null;
+          mh.version.pc.onconnectionstatechange = null;
+          mh.version.pc.onicecandidate = null;
+        }
+        mh.close();
+      }
+    } catch { /* best effort */ }
+
+    try { call.removeAllListeners(); } catch { /* best effort */ }
+    try { if (c._cleanupEventListeners) c._cleanupEventListeners(); } catch { /* best effort */ }
+
+    try { call.disconnect(); } catch { /* best effort */ }
+
+    if (callSid) {
+      this.handleCallDisconnected(callSid);
+    }
   }
 
   // ─── Private: Event Wiring ─────────────────────────────────────────
 
   private wireDeviceEvents(device: Device): void {
-    // Registration success
     device.on('registered', () => {
       this.notifyListeners('registrationSuccess', {});
     });
 
-    // Registration/general errors
     device.on('error', (error: unknown) => {
       const message = error instanceof Error ? error.message : String(error);
-      this.notifyListeners('registrationFailure', {
-        error: message,
-      });
+      console.warn(`[TwilioVoiceWeb:${CapacitorTwilioVoiceWeb.PLUGIN_BUILD}] Device error:`, message);
+      this.notifyListeners('registrationFailure', { error: message });
     });
 
-    // Incoming call
     device.on('incoming', (call: Call) => {
       const callSid = call.parameters?.CallSid || `incoming-${Date.now()}`;
 
-      // Wire call events
       this.wireCallEvents(call, callSid);
-
-      // Track as pending invite
       this.pendingInvites.set(callSid, call);
 
-      // Extract caller info
       const from = call.parameters?.From || '';
       const to = call.parameters?.To || '';
       let customParams = this.callCustomParamsToRecord(call.customParameters);
 
-      // On web, Twilio puts custom TwiML params in parameters.Params as a
-      // URL-encoded string (e.g. "displayName=%2B47...&CapacitorTwilioCallerName=...").
-      // The native iOS/Android SDK parses these into customParameters automatically,
-      // but the JS SDK does not — we parse them here for parity.
+      // The JS SDK doesn't parse TwiML Params the way native SDKs do.
+      // Parse the URL-encoded string for parity with iOS/Android.
       if (call.parameters?.Params && Object.keys(customParams).length === 0) {
         try {
           const parsed = new URLSearchParams(call.parameters.Params);
           parsed.forEach((value, key) => {
             customParams[key] = value;
           });
-        } catch {
-          // Ignore parse errors — fall through with empty customParams
-        }
+        } catch { /* ignore parse errors */ }
       }
 
-      // Emit callInviteReceived via Capacitor event system + window fallback
-      const payload = {
-        callSid,
-        from,
-        to,
-        customParams,
-      };
+      const payload = { callSid, from, to, customParams };
       this.notifyListeners('callInviteReceived', payload);
       this.dispatchFallbackEvent('callInviteReceived', payload);
     });
 
-    // Listen for device audio changes
     if (device.audio) {
       device.audio.on('deviceChange', () => {
         this.emitAudioDevicesChanged();
@@ -526,26 +507,22 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
   }
 
   private wireCallEvents(call: Call, callSid: string): void {
-    // Call accepted/connected
     call.on('accept', () => {
       const data = { callSid };
       this.notifyListeners('callConnected', data);
       this.dispatchFallbackEvent('callConnected', data);
     });
 
-    // Call disconnected
     call.on('disconnect', () => {
       this.handleCallDisconnected(callSid);
     });
 
-    // Call ringing (outgoing)
     call.on('ringing', () => {
       const data = { callSid };
       this.notifyListeners('callRinging', data);
       this.dispatchFallbackEvent('callRinging', data);
     });
 
-    // Reconnecting
     call.on('reconnecting', (error: unknown) => {
       const message = error instanceof Error ? error.message : undefined;
       const data = { callSid, error: message };
@@ -553,14 +530,12 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
       this.dispatchFallbackEvent('callReconnecting', data);
     });
 
-    // Reconnected
     call.on('reconnected', () => {
       const data = { callSid };
       this.notifyListeners('callReconnected', data);
       this.dispatchFallbackEvent('callReconnected', data);
     });
 
-    // Cancel (incoming call cancelled by caller)
     call.on('cancel', () => {
       this.pendingInvites.delete(callSid);
       const data = { callSid, reason: 'remote_cancelled' as const };
@@ -568,9 +543,11 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
       this.dispatchFallbackEvent('callInviteCancelled', data);
     });
 
-    // Error on call
-    call.on('error', () => {
-      // If this is an outgoing call that hasn't connected, emit outgoingCallFailed
+    call.on('error', (error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      const code = (error as any)?.code;
+      console.warn(`[TwilioVoiceWeb:${CapacitorTwilioVoiceWeb.PLUGIN_BUILD}] Call error (${callSid}): code=${code} ${message}`);
+
       if (call.direction === 'OUTGOING' && call.status() !== 'open') {
         const data = {
           callSid,
@@ -582,7 +559,6 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
       }
     });
 
-    // Quality warnings
     call.on('warning', (warningName: string) => {
       if (!this.currentWarnings.has(callSid)) {
         this.currentWarnings.set(callSid, new Set());

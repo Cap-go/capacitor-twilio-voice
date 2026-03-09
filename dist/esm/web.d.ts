@@ -8,6 +8,7 @@ export declare class CapacitorTwilioVoiceWeb extends WebPlugin implements Capaci
     private accessToken;
     private currentWarnings;
     private selectedOutputDeviceId;
+    private static readonly PLUGIN_BUILD;
     login(options: {
         accessToken: string;
     }): Promise<{
@@ -92,6 +93,20 @@ export declare class CapacitorTwilioVoiceWeb extends WebPlugin implements Capaci
     getPluginVersion(): Promise<{
         version: string;
     }>;
+    /**
+     * Aggressively kill a call and break any ICE restart loops.
+     *
+     * The Twilio SDK has an internal loop driven by direct property callbacks
+     * and a backoff timer — not by EventEmitter listeners. This method breaks
+     * the loop at every level:
+     *   1. Reset/remove the backoff timer that schedules iceRestart
+     *   2. Null out _mediaHandler property callbacks (not EventEmitter)
+     *   3. Null out raw RTCPeerConnection event handlers and close the PC
+     *   4. Remove EventEmitter + pstream listeners
+     *   5. Attempt normal disconnect (best-effort)
+     *   6. Emit disconnected event for UI update
+     */
+    private forceKillCall;
     private wireDeviceEvents;
     private wireCallEvents;
     private handleCallDisconnected;
