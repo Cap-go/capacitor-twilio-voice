@@ -105,7 +105,10 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
 
   // ─── Call Management ───────────────────────────────────────────────
 
-  async makeCall(options: { to: string; params?: Record<string, string> }): Promise<{ success: boolean; callSid?: string }> {
+  async makeCall(options: {
+    to: string;
+    params?: Record<string, string>;
+  }): Promise<{ success: boolean; callSid?: string }> {
     if (!this.device || this.device.state !== Device.State.Registered) {
       this.notifyListeners('outgoingCallFailed', {
         callSid: '',
@@ -126,10 +129,11 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
     }
 
     try {
-      const connectParams: Record<string, string> = { To: options.to };
+      const connectParams: Record<string, string> = {};
       if (options.params) {
         Object.assign(connectParams, options.params);
       }
+      connectParams.To = options.to;
       const call = await this.device.connect({
         params: connectParams,
       });
@@ -209,7 +213,9 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
       return { success: false };
     }
 
-    console.log(`[TwilioVoiceWeb:${CapacitorTwilioVoiceWeb.PLUGIN_BUILD}] endCall: ${resolvedCallSid}, status=${call.status()}`);
+    console.log(
+      `[TwilioVoiceWeb:${CapacitorTwilioVoiceWeb.PLUGIN_BUILD}] endCall: ${resolvedCallSid}, status=${call.status()}`,
+    );
 
     // Phase 1: Graceful disconnect — sends hangup to Twilio servers via PStream.
     // This MUST happen before any cleanup because call._disconnect() checks
@@ -227,17 +233,23 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
         try {
           call.disconnect();
           gracefulDone = true;
-        } catch { /* fall through to direct hangup */ }
+        } catch {
+          /* fall through to direct hangup */
+        }
 
         // If disconnect() was a no-op (wrong call state), send hangup directly
         if (!gracefulDone) {
           try {
             c._pstream.hangup(callSidForHangup, null);
             gracefulDone = true;
-          } catch { /* pstream might be broken */ }
+          } catch {
+            /* pstream might be broken */
+          }
         }
       }
-    } catch { /* best effort */ }
+    } catch {
+      /* best effort */
+    }
 
     // Phase 2: Hard cleanup — break ICE restart loops and tear down WebRTC.
     // Schedule after a short delay to let the hangup message flush through
@@ -250,10 +262,9 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
       setTimeout(runHardCleanup, CapacitorTwilioVoiceWeb.HARD_CLEANUP_TIMEOUT_MS);
     } else {
       runHardCleanup();
-    }
-
-    if (resolvedCallSid) {
-      this.handleCallDisconnected(resolvedCallSid);
+      if (resolvedCallSid) {
+        this.handleCallDisconnected(resolvedCallSid);
+      }
     }
 
     return { success: true };
@@ -447,7 +458,9 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
         c._mediaReconnectBackoff.reset();
         c._mediaReconnectBackoff.removeAllListeners();
       }
-    } catch { /* best effort */ }
+    } catch {
+      /* best effort */
+    }
 
     try {
       const mh = c._mediaHandler;
@@ -463,7 +476,9 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
         mh.onclose = noop;
         mh.onopen = noop;
       }
-    } catch { /* best effort */ }
+    } catch {
+      /* best effort */
+    }
 
     try {
       const mh = c._mediaHandler;
@@ -476,10 +491,20 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
         }
         mh.close();
       }
-    } catch { /* best effort */ }
+    } catch {
+      /* best effort */
+    }
 
-    try { call.removeAllListeners(); } catch { /* best effort */ }
-    try { if (c._cleanupEventListeners) c._cleanupEventListeners(); } catch { /* best effort */ }
+    try {
+      call.removeAllListeners();
+    } catch {
+      /* best effort */
+    }
+    try {
+      if (c._cleanupEventListeners) c._cleanupEventListeners();
+    } catch {
+      /* best effort */
+    }
 
     console.log(`[TwilioVoiceWeb:${CapacitorTwilioVoiceWeb.PLUGIN_BUILD}] hardCleanupCall done: ${callSid}`);
   }
@@ -489,12 +514,14 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
   private wireDeviceEvents(device: Device): void {
     device.on('registered', () => {
       this.notifyListeners('registrationSuccess', {});
+      this.dispatchFallbackEvent('registrationSuccess', {});
     });
 
     device.on('error', (error: unknown) => {
       const message = error instanceof Error ? error.message : String(error);
       console.warn(`[TwilioVoiceWeb:${CapacitorTwilioVoiceWeb.PLUGIN_BUILD}] Device error:`, message);
       this.notifyListeners('registrationFailure', { error: message });
+      this.dispatchFallbackEvent('registrationFailure', { error: message });
     });
 
     device.on('incoming', (call: Call) => {
@@ -515,7 +542,9 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
           parsed.forEach((value, key) => {
             customParams[key] = value;
           });
-        } catch { /* ignore parse errors */ }
+        } catch {
+          /* ignore parse errors */
+        }
       }
 
       const payload = { callSid, from, to, customParams };
@@ -531,50 +560,76 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
   }
 
   private wireCallEvents(call: Call, callSid: string): void {
+    let currentSid = callSid;
+    let rekeyed = false;
+
+    const rekeyIfNeeded = () => {
+      if (rekeyed) return;
+      const realSid = call.parameters?.CallSid;
+      if (realSid && realSid !== currentSid) {
+        const existing = this.activeCalls.get(currentSid);
+        if (existing === call) {
+          this.activeCalls.delete(currentSid);
+          this.activeCalls.set(realSid, call);
+        }
+        currentSid = realSid;
+        rekeyed = true;
+      }
+    };
+
     call.on('accept', () => {
-      const data = { callSid };
+      rekeyIfNeeded();
+      const data = { callSid: currentSid };
       this.notifyListeners('callConnected', data);
       this.dispatchFallbackEvent('callConnected', data);
     });
 
     call.on('disconnect', () => {
-      this.handleCallDisconnected(callSid);
+      rekeyIfNeeded();
+      this.handleCallDisconnected(currentSid);
     });
 
     call.on('ringing', () => {
-      const data = { callSid };
+      rekeyIfNeeded();
+      const data = { callSid: currentSid };
       this.notifyListeners('callRinging', data);
       this.dispatchFallbackEvent('callRinging', data);
     });
 
     call.on('reconnecting', (error: unknown) => {
+      rekeyIfNeeded();
       const message = error instanceof Error ? error.message : undefined;
-      const data = { callSid, error: message };
+      const data = { callSid: currentSid, error: message };
       this.notifyListeners('callReconnecting', data);
       this.dispatchFallbackEvent('callReconnecting', data);
     });
 
     call.on('reconnected', () => {
-      const data = { callSid };
+      rekeyIfNeeded();
+      const data = { callSid: currentSid };
       this.notifyListeners('callReconnected', data);
       this.dispatchFallbackEvent('callReconnected', data);
     });
 
     call.on('cancel', () => {
-      this.pendingInvites.delete(callSid);
-      const data = { callSid, reason: 'remote_cancelled' as const };
+      rekeyIfNeeded();
+      this.pendingInvites.delete(currentSid);
+      const data = { callSid: currentSid, reason: 'remote_cancelled' as const };
       this.notifyListeners('callInviteCancelled', data);
       this.dispatchFallbackEvent('callInviteCancelled', data);
     });
 
     call.on('error', (error: unknown) => {
+      rekeyIfNeeded();
       const message = error instanceof Error ? error.message : String(error);
       const code = (error as any)?.code;
-      console.warn(`[TwilioVoiceWeb:${CapacitorTwilioVoiceWeb.PLUGIN_BUILD}] Call error (${callSid}): code=${code} ${message}`);
+      console.warn(
+        `[TwilioVoiceWeb:${CapacitorTwilioVoiceWeb.PLUGIN_BUILD}] Call error (${currentSid}): code=${code} ${message}`,
+      );
 
       if (call.direction === 'OUTGOING' && call.status() !== 'open') {
         const data = {
-          callSid,
+          callSid: currentSid,
           to: call.parameters?.To || '',
           reason: 'connection_failed' as const,
         };
@@ -584,31 +639,37 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
     });
 
     call.on('warning', (warningName: string) => {
-      if (!this.currentWarnings.has(callSid)) {
-        this.currentWarnings.set(callSid, new Set());
+      rekeyIfNeeded();
+      if (!this.currentWarnings.has(currentSid)) {
+        this.currentWarnings.set(currentSid, new Set());
       }
-      const warnings = this.currentWarnings.get(callSid)!;
+      const warnings = this.currentWarnings.get(currentSid)!;
       const previousWarnings = Array.from(warnings);
       warnings.add(warningName);
 
-      this.notifyListeners('callQualityWarningsChanged', {
-        callSid,
+      const data = {
+        callSid: currentSid,
         currentWarnings: Array.from(warnings),
         previousWarnings,
-      });
+      };
+      this.notifyListeners('callQualityWarningsChanged', data);
+      this.dispatchFallbackEvent('callQualityWarningsChanged', data);
     });
 
     call.on('warning-cleared', (warningName: string) => {
-      const warnings = this.currentWarnings.get(callSid);
+      rekeyIfNeeded();
+      const warnings = this.currentWarnings.get(currentSid);
       if (warnings) {
         const previousWarnings = Array.from(warnings);
         warnings.delete(warningName);
 
-        this.notifyListeners('callQualityWarningsChanged', {
-          callSid,
+        const data = {
+          callSid: currentSid,
           currentWarnings: Array.from(warnings),
           previousWarnings,
-        });
+        };
+        this.notifyListeners('callQualityWarningsChanged', data);
+        this.dispatchFallbackEvent('callQualityWarningsChanged', data);
       }
     });
   }
@@ -640,9 +701,18 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
 
   // ─── Private: Helpers ──────────────────────────────────────────────
 
+  private base64UrlDecode(str: string): string {
+    let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+    const pad = base64.length % 4;
+    if (pad) {
+      base64 += '='.repeat(4 - pad);
+    }
+    return atob(base64);
+  }
+
   private isTokenExpired(token: string): boolean {
     try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
+      const payload = JSON.parse(this.base64UrlDecode(token.split('.')[1]));
       return payload.exp ? payload.exp < Date.now() / 1000 : false;
     } catch {
       return true;
@@ -651,7 +721,7 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
 
   private getIdentityFromToken(token: string): string | undefined {
     try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
+      const payload = JSON.parse(this.base64UrlDecode(token.split('.')[1]));
       return payload.grants?.identity;
     } catch {
       return undefined;
@@ -698,7 +768,9 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
 
   private async emitAudioDevicesChanged(): Promise<void> {
     const { inputs, outputs } = await this.getAudioDevices();
-    this.notifyListeners('audioDevicesChanged', { inputs, outputs });
+    const data = { inputs, outputs };
+    this.notifyListeners('audioDevicesChanged', data);
+    this.dispatchFallbackEvent('audioDevicesChanged', data);
   }
 
   /**

@@ -70,6 +70,7 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
         let completion: (Bool) -> Void
         let isSystemInitiated: Bool
         let displayName: String?
+        let params: [String: String]?
     }
     private var pendingOutgoingCalls: [UUID: PendingOutgoingCall] = [:]
 
@@ -381,6 +382,15 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
             return
         }
 
+        var extraParams: [String: String]?
+        if let paramsObj = call.getObject("params") {
+            var dict = [String: String]()
+            for (key, value) in paramsObj {
+                dict[key] = "\(value)"
+            }
+            extraParams = dict
+        }
+
         checkRecordPermission { [weak self] permissionGranted in
             guard permissionGranted else {
                 call.reject("Microphone permission not granted")
@@ -392,6 +402,7 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
                                          handle: to,
                                          to: to,
                                          isSystemInitiated: false,
+                                         params: extraParams,
                                          completion: { success in
                                             if success {
                                                 call.resolve(["success": true, "callSid": uuid.uuidString])
@@ -858,6 +869,7 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
                                         to: String,
                                         isSystemInitiated: Bool,
                                         displayName: String? = nil,
+                                        params: [String: String]? = nil,
                                         completion: @escaping (Bool) -> Void) {
         guard let provider = callKitProvider else {
             completion(false)
@@ -867,7 +879,8 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
         pendingOutgoingCalls[uuid] = PendingOutgoingCall(to: to,
                                                          completion: completion,
                                                          isSystemInitiated: isSystemInitiated,
-                                                         displayName: displayName)
+                                                         displayName: displayName,
+                                                         params: params)
 
         let callHandle = CXHandle(type: .generic, value: handle)
         let startCallAction = CXStartCallAction(call: uuid, handle: callHandle)
@@ -930,9 +943,17 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
         }
     }
 
-    private func performVoiceCall(uuid: UUID, to: String, completionHandler: @escaping (Bool) -> Void) {
+    private func performVoiceCall(uuid: UUID, to: String, extraParams: [String: String]? = nil, completionHandler: @escaping (Bool) -> Void) {
         let connectOptions = ConnectOptions(accessToken: accessToken) { builder in
-            builder.params = [twimlParamTo: to]
+            var params: [String: String] = [twimlParamTo: to]
+            if let extra = extraParams {
+                for (key, value) in extra {
+                    if key != twimlParamTo {
+                        params[key] = value
+                    }
+                }
+            }
+            builder.params = params
             builder.uuid = uuid
         }
 
@@ -1179,7 +1200,8 @@ extension CapacitorTwilioVoicePlugin: CXProviderDelegate {
             let fallback = PendingOutgoingCall(to: handleValue,
                                                completion: { _ in },
                                                isSystemInitiated: true,
-                                               displayName: nil)
+                                               displayName: nil,
+                                               params: nil)
             pendingOutgoingCalls[uuid] = fallback
             pendingCall = fallback
         }
@@ -1223,7 +1245,7 @@ extension CapacitorTwilioVoicePlugin: CXProviderDelegate {
 
         provider.reportOutgoingCall(with: uuid, startedConnectingAt: Date())
 
-        performVoiceCall(uuid: uuid, to: to) { [weak self] success in
+        performVoiceCall(uuid: uuid, to: to, extraParams: callDetails.params) { [weak self] success in
             callDetails.completion(success)
             if !success {
                 self?.emitOutgoingCallFailed(uuid: uuid,
@@ -1308,7 +1330,7 @@ extension CapacitorTwilioVoicePlugin: AVAudioPlayerDelegate {
     @objc func getAudioDevices(_ call: CAPPluginCall) {
         // Audio device selection is only supported on web platform.
         // On iOS, the system manages audio routing automatically.
-        call.resolve(["devices": []])
+        call.resolve(["inputs": [], "outputs": []])
     }
 
     @objc func setInputDevice(_ call: CAPPluginCall) {

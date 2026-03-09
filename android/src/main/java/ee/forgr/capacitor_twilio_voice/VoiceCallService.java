@@ -42,6 +42,7 @@ public class VoiceCallService extends Service {
     public static final String EXTRA_CALL_SID = "CALL_SID";
     public static final String EXTRA_MUTED = "MUTED";
     public static final String EXTRA_SPEAKER_ENABLED = "SPEAKER_ENABLED";
+    public static final String EXTRA_CALL_PARAMS = "CALL_PARAMS";
 
     private Call activeCall;
     private CallInvite activeCallInvite;
@@ -183,9 +184,22 @@ public class VoiceCallService extends Service {
         // Start foreground service with ongoing call notification
         startForeground(VOICE_NOTIFICATION_ID, createOngoingCallNotification("Connecting...", false));
 
-        ConnectOptions.Builder builder = new ConnectOptions.Builder(accessToken);
+        java.util.Map<String, String> params = new java.util.HashMap<>();
         if (to != null && !to.isEmpty()) {
-            builder.params(java.util.Collections.singletonMap("to", to));
+            params.put("to", to);
+        }
+        android.os.Bundle extraParams = intent.getBundleExtra(EXTRA_CALL_PARAMS);
+        if (extraParams != null) {
+            for (String key : extraParams.keySet()) {
+                if (!"to".equals(key)) {
+                    params.put(key, extraParams.getString(key));
+                }
+            }
+        }
+
+        ConnectOptions.Builder builder = new ConnectOptions.Builder(accessToken);
+        if (!params.isEmpty()) {
+            builder.params(params);
         }
 
         activeCall = Voice.connect(this, builder.build(), callListener);

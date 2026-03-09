@@ -778,6 +778,24 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         requestMicrophonePermission();
     }
 
+    private android.os.Bundle extractCallParams(PluginCall call) {
+        com.getcapacitor.JSObject paramsObj = call.getObject("params");
+        if (paramsObj == null) {
+            return null;
+        }
+        android.os.Bundle bundle = new android.os.Bundle();
+        java.util.Iterator<String> keys = paramsObj.keys();
+        while (keys.hasNext()) {
+            String key = keys.next();
+            try {
+                bundle.putString(key, paramsObj.getString(key));
+            } catch (Exception e) {
+                // skip non-string values
+            }
+        }
+        return bundle.isEmpty() ? null : bundle;
+    }
+
     private void startOutgoingCall(PluginCall call, String to) {
         Log.d(TAG, "startOutgoingCall: to=" + to);
         // Start call via the foreground service
@@ -785,6 +803,10 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         serviceIntent.setAction(VoiceCallService.ACTION_START_CALL);
         serviceIntent.putExtra(VoiceCallService.EXTRA_CALL_TO, to);
         serviceIntent.putExtra(VoiceCallService.EXTRA_ACCESS_TOKEN, accessToken);
+        android.os.Bundle callParams = extractCallParams(call);
+        if (callParams != null) {
+            serviceIntent.putExtra(VoiceCallService.EXTRA_CALL_PARAMS, callParams);
+        }
 
         try {
             getSafeContext().startForegroundService(serviceIntent);
@@ -1868,7 +1890,8 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         // Audio device selection is only supported on web platform.
         // On Android, the system manages audio routing automatically.
         final JSObject ret = new JSObject();
-        ret.put("devices", new com.getcapacitor.JSArray());
+        ret.put("inputs", new com.getcapacitor.JSArray());
+        ret.put("outputs", new com.getcapacitor.JSArray());
         call.resolve(ret);
     }
 
@@ -1886,4 +1909,5 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         final JSObject ret = new JSObject();
         ret.put("success", true);
         call.resolve(ret);
+    }
 }

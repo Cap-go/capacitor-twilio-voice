@@ -111,6 +111,7 @@ export declare class CapacitorTwilioVoiceWeb extends WebPlugin implements Capaci
     private wireDeviceEvents;
     private wireCallEvents;
     private handleCallDisconnected;
+    private base64UrlDecode;
     private isTokenExpired;
     private getIdentityFromToken;
     private getCallSid;
