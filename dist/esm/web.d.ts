@@ -8,7 +8,6 @@ export declare class CapacitorTwilioVoiceWeb extends WebPlugin implements Capaci
     private accessToken;
     private currentWarnings;
     private selectedOutputDeviceId;
-    private static readonly PLUGIN_BUILD;
     private static readonly HARD_CLEANUP_TIMEOUT_MS;
     login(options: {
         accessToken: string;
