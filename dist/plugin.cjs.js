@@ -10,15 +10,12 @@ const CapacitorTwilioVoice = core.registerPlugin('CapacitorTwilioVoice', {
 class CapacitorTwilioVoiceWeb extends core.WebPlugin {
     constructor() {
         super(...arguments);
-        // Twilio SDK instances
         this.device = null;
         this.activeCall = null;
-        // State tracking
         this.activeCalls = new Map();
         this.pendingInvites = new Map();
         this.accessToken = null;
         this.currentWarnings = new Map();
-        // Audio device state
         this.selectedOutputDeviceId = null;
     }
     // ─── Authentication ────────────────────────────────────────────────
@@ -28,7 +25,6 @@ class CapacitorTwilioVoiceWeb extends core.WebPlugin {
             throw new Error('Access token is expired');
         }
         this.accessToken = options.accessToken;
-        // If device already exists, update token and re-register
         if (this.device) {
             this.device.updateToken(options.accessToken);
             if (this.device.state !== voiceSdk.Device.State.Registered) {
@@ -36,16 +32,19 @@ class CapacitorTwilioVoiceWeb extends core.WebPlugin {
             }
             return { success: true };
         }
-        // Create new Device
+        // Disable AudioContext-based sounds to avoid autoplay policy warnings
+        // when Device is created before a user gesture (which happens during
+        // automatic login on page load). The browser blocks AudioContext.play()
+        // before interaction, and the SDK's Sound constructor fires play()
+        // during Device construction — leading to 15+ console warnings.
         this.device = new voiceSdk.Device(options.accessToken, {
             logLevel: 3,
             codecPreferences: [voiceSdk.Call.Codec.Opus, voiceSdk.Call.Codec.PCMU],
             closeProtection: true,
             allowIncomingWhileBusy: true,
+            disableAudioContextSounds: true,
         });
-        // Wire device-level events
         this.wireDeviceEvents(this.device);
-        // Register — resolves on 'registered', rejects on 'error'
         return new Promise((resolve, reject) => {
             const onRegistered = () => {
                 cleanup();
@@ -69,18 +68,12 @@ class CapacitorTwilioVoiceWeb extends core.WebPlugin {
         if (!this.device) {
             return { success: true };
         }
-        // Disconnect all active calls
-        for (const call of this.activeCalls.values()) {
-            call.disconnect();
-        }
-        // Reject all pending invites
+        this.device.disconnectAll();
         for (const call of this.pendingInvites.values()) {
             call.reject();
         }
-        // Unregister and destroy device
         this.device.unregister();
         this.device.destroy();
-        // Clear all state
         this.device = null;
         this.activeCall = null;
         this.activeCalls.clear();
@@ -107,7 +100,6 @@ class CapacitorTwilioVoiceWeb extends core.WebPlugin {
             });
             return { success: false };
         }
-        // Check microphone permission
         const micPermission = await this.checkMicrophonePermission();
         if (!micPermission.granted) {
             this.notifyListeners('outgoingCallFailed', {
@@ -119,7 +111,6 @@ class CapacitorTwilioVoiceWeb extends core.WebPlugin {
         }
         try {
             const connectParams = { To: options.to };
-            // Pass custom params (displayName, wardName, accessId, etc.) through to Twilio
             if (options.params) {
                 Object.assign(connectParams, options.params);
             }
@@ -127,12 +118,9 @@ class CapacitorTwilioVoiceWeb extends core.WebPlugin {
                 params: connectParams,
             });
             const callSid = ((_a = call.parameters) === null || _a === void 0 ? void 0 : _a.CallSid) || `web-${Date.now()}`;
-            // Wire call events
             this.wireCallEvents(call, callSid);
-            // Track call
             this.activeCalls.set(callSid, call);
             this.activeCall = call;
-            // Emit outgoingCallInitiated
             const outgoingData = {
                 callSid,
                 to: options.to,
@@ -157,7 +145,6 @@ class CapacitorTwilioVoiceWeb extends core.WebPlugin {
             return { success: false };
         }
         call.accept();
-        // Move from pending to active
         this.pendingInvites.delete(options.callSid);
         this.activeCalls.set(options.callSid, call);
         this.activeCall = call;
@@ -169,7 +156,6 @@ class CapacitorTwilioVoiceWeb extends core.WebPlugin {
             return { success: false };
         }
         call.reject();
-        // Remove from pending and emit cancellation
         this.pendingInvites.delete(options.callSid);
         const rejectData = {
             callSid: options.callSid,
@@ -180,6 +166,7 @@ class CapacitorTwilioVoiceWeb extends core.WebPlugin {
         return { success: true };
     }
     async endCall(options) {
+        var _a;
         let call;
         let resolvedCallSid;
         if (options.callSid) {
@@ -193,7 +180,50 @@ class CapacitorTwilioVoiceWeb extends core.WebPlugin {
         if (!call) {
             return { success: false };
         }
-        this.forceKillCall(call, resolvedCallSid);
+        console.log(`[TwilioVoiceWeb:${CapacitorTwilioVoiceWeb.PLUGIN_BUILD}] endCall: ${resolvedCallSid}, status=${call.status()}`);
+        // Phase 1: Graceful disconnect — sends hangup to Twilio servers via PStream.
+        // This MUST happen before any cleanup because call._disconnect() checks
+        // pstream.status !== 'disconnected' before sending the hangup message.
+        // If we tear down the pstream/mediaHandler first, the hangup never reaches
+        // Twilio and the remote party's call continues indefinitely.
+        let gracefulDone = false;
+        try {
+            const c = call;
+            const pstreamAlive = c._pstream && c._pstream.status !== 'disconnected';
+            const callSidForHangup = ((_a = call.parameters) === null || _a === void 0 ? void 0 : _a.CallSid) || c.outboundConnectionId;
+            if (pstreamAlive && callSidForHangup) {
+                // Try SDK's public disconnect first (it handles state checks + hangup)
+                try {
+                    call.disconnect();
+                    gracefulDone = true;
+                }
+                catch ( /* fall through to direct hangup */_b) { /* fall through to direct hangup */ }
+                // If disconnect() was a no-op (wrong call state), send hangup directly
+                if (!gracefulDone) {
+                    try {
+                        c._pstream.hangup(callSidForHangup, null);
+                        gracefulDone = true;
+                    }
+                    catch ( /* pstream might be broken */_c) { /* pstream might be broken */ }
+                }
+            }
+        }
+        catch ( /* best effort */_d) { /* best effort */ }
+        // Phase 2: Hard cleanup — break ICE restart loops and tear down WebRTC.
+        // Schedule after a short delay to let the hangup message flush through
+        // the WebSocket, or run immediately if graceful disconnect failed.
+        const runHardCleanup = () => {
+            this.hardCleanupCall(call, resolvedCallSid);
+        };
+        if (gracefulDone) {
+            setTimeout(runHardCleanup, CapacitorTwilioVoiceWeb.HARD_CLEANUP_TIMEOUT_MS);
+        }
+        else {
+            runHardCleanup();
+        }
+        if (resolvedCallSid) {
+            this.handleCallDisconnected(resolvedCallSid);
+        }
         return { success: true };
     }
     // ─── Call Controls ─────────────────────────────────────────────────
@@ -218,9 +248,6 @@ class CapacitorTwilioVoiceWeb extends core.WebPlugin {
         if (!this.device) {
             return { success: false };
         }
-        // On web, setSpeaker is a best-effort operation.
-        // If output selection is supported (setSinkId API), we can route audio.
-        // Otherwise, this is a no-op that returns success (audio goes through default output).
         if (!((_a = this.device.audio) === null || _a === void 0 ? void 0 : _a.isOutputSelectionSupported)) {
             return { success: true };
         }
@@ -253,7 +280,7 @@ class CapacitorTwilioVoiceWeb extends core.WebPlugin {
         });
         return {
             hasActiveCall: this.activeCall !== null,
-            isOnHold: false, // Twilio JS SDK does not have hold — always false
+            isOnHold: false,
             isMuted: (_b = (_a = this.activeCall) === null || _a === void 0 ? void 0 : _a.isMuted()) !== null && _b !== void 0 ? _b : false,
             callSid,
             callState,
@@ -270,7 +297,6 @@ class CapacitorTwilioVoiceWeb extends core.WebPlugin {
                 });
                 return { granted: result.state === 'granted' };
             }
-            // Fallback: check if device labels are available (implies permission was granted)
             const devices = await navigator.mediaDevices.enumerateDevices();
             const hasLabels = devices.some((d) => d.kind === 'audioinput' && d.label !== '');
             return { granted: hasLabels };
@@ -282,7 +308,6 @@ class CapacitorTwilioVoiceWeb extends core.WebPlugin {
     async requestMicrophonePermission() {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            // Stop all tracks immediately — we only needed the permission prompt
             stream.getTracks().forEach((track) => track.stop());
             return { granted: true };
         }
@@ -351,19 +376,19 @@ class CapacitorTwilioVoiceWeb extends core.WebPlugin {
     }
     // ─── Private: Call Cleanup ──────────────────────────────────────────
     /**
-     * Aggressively kill a call and break any ICE restart loops.
+     * Tear down a Call's internal WebRTC and backoff machinery to break ICE
+     * restart loops. This is the "hard" phase — only run AFTER the graceful
+     * disconnect has had time to send the hangup message via PStream.
      *
-     * The Twilio SDK has an internal loop driven by direct property callbacks
-     * and a backoff timer — not by EventEmitter listeners. This method breaks
-     * the loop at every level:
-     *   1. Reset/remove the backoff timer that schedules iceRestart
-     *   2. Null out _mediaHandler property callbacks (not EventEmitter)
-     *   3. Null out raw RTCPeerConnection event handlers and close the PC
-     *   4. Remove EventEmitter + pstream listeners
-     *   5. Attempt normal disconnect (best-effort)
-     *   6. Emit disconnected event for UI update
+     * The SDK's ICE loop is driven by direct property callbacks and a backoff
+     * timer (not EventEmitter listeners), so removeAllListeners() alone is
+     * insufficient. We must:
+     *   1. Reset the backoff timer that schedules iceRestart()
+     *   2. Null out _mediaHandler property callbacks
+     *   3. Close the RTCPeerConnection
+     *   4. Remove EventEmitter + PStream listeners
      */
-    forceKillCall(call, callSid) {
+    hardCleanupCall(call, callSid) {
         var _a;
         const c = call;
         try {
@@ -411,13 +436,7 @@ class CapacitorTwilioVoiceWeb extends core.WebPlugin {
                 c._cleanupEventListeners();
         }
         catch ( /* best effort */_f) { /* best effort */ }
-        try {
-            call.disconnect();
-        }
-        catch ( /* best effort */_g) { /* best effort */ }
-        if (callSid) {
-            this.handleCallDisconnected(callSid);
-        }
+        console.log(`[TwilioVoiceWeb:${CapacitorTwilioVoiceWeb.PLUGIN_BUILD}] hardCleanupCall done: ${callSid}`);
     }
     // ─── Private: Event Wiring ─────────────────────────────────────────
     wireDeviceEvents(device) {
@@ -533,11 +552,9 @@ class CapacitorTwilioVoiceWeb extends core.WebPlugin {
     handleCallDisconnected(callSid) {
         var _a;
         const call = this.activeCalls.get(callSid);
-        // Remove from tracking
         this.activeCalls.delete(callSid);
         this.pendingInvites.delete(callSid);
         this.currentWarnings.delete(callSid);
-        // Clean up mic if no more active calls
         if (this.activeCalls.size === 0 && ((_a = this.device) === null || _a === void 0 ? void 0 : _a.audio)) {
             try {
                 this.device.audio.unsetInputDevice();
@@ -546,12 +563,10 @@ class CapacitorTwilioVoiceWeb extends core.WebPlugin {
                 // Ignore — may already be unset
             }
         }
-        // Update activeCall reference
         if (this.activeCall === call) {
             const remaining = Array.from(this.activeCalls.values());
             this.activeCall = remaining.length > 0 ? remaining[remaining.length - 1] : null;
         }
-        // Emit event
         const data = { callSid };
         this.notifyListeners('callDisconnected', data);
         this.dispatchFallbackEvent('callDisconnected', data);
@@ -632,7 +647,8 @@ class CapacitorTwilioVoiceWeb extends core.WebPlugin {
         }
     }
 }
-CapacitorTwilioVoiceWeb.PLUGIN_BUILD = 'web-8.0.17-build.4';
+CapacitorTwilioVoiceWeb.PLUGIN_BUILD = 'web-8.0.17-build.5';
+CapacitorTwilioVoiceWeb.HARD_CLEANUP_TIMEOUT_MS = 500;
 
 var web = /*#__PURE__*/Object.freeze({
     __proto__: null,

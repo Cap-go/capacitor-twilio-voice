@@ -9,6 +9,7 @@ export declare class CapacitorTwilioVoiceWeb extends WebPlugin implements Capaci
     private currentWarnings;
     private selectedOutputDeviceId;
     private static readonly PLUGIN_BUILD;
+    private static readonly HARD_CLEANUP_TIMEOUT_MS;
     login(options: {
         accessToken: string;
     }): Promise<{
@@ -94,19 +95,19 @@ export declare class CapacitorTwilioVoiceWeb extends WebPlugin implements Capaci
         version: string;
     }>;
     /**
-     * Aggressively kill a call and break any ICE restart loops.
+     * Tear down a Call's internal WebRTC and backoff machinery to break ICE
+     * restart loops. This is the "hard" phase — only run AFTER the graceful
+     * disconnect has had time to send the hangup message via PStream.
      *
-     * The Twilio SDK has an internal loop driven by direct property callbacks
-     * and a backoff timer — not by EventEmitter listeners. This method breaks
-     * the loop at every level:
-     *   1. Reset/remove the backoff timer that schedules iceRestart
-     *   2. Null out _mediaHandler property callbacks (not EventEmitter)
-     *   3. Null out raw RTCPeerConnection event handlers and close the PC
-     *   4. Remove EventEmitter + pstream listeners
-     *   5. Attempt normal disconnect (best-effort)
-     *   6. Emit disconnected event for UI update
+     * The SDK's ICE loop is driven by direct property callbacks and a backoff
+     * timer (not EventEmitter listeners), so removeAllListeners() alone is
+     * insufficient. We must:
+     *   1. Reset the backoff timer that schedules iceRestart()
+     *   2. Null out _mediaHandler property callbacks
+     *   3. Close the RTCPeerConnection
+     *   4. Remove EventEmitter + PStream listeners
      */
-    private forceKillCall;
+    private hardCleanupCall;
     private wireDeviceEvents;
     private wireCallEvents;
     private handleCallDisconnected;
