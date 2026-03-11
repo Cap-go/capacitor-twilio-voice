@@ -109,11 +109,10 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin {
             return { success: false };
         }
         try {
-            const connectParams = {};
+            const connectParams = { To: options.to };
             if (options.params) {
                 Object.assign(connectParams, options.params);
             }
-            connectParams.To = options.to;
             const call = await this.device.connect({
                 params: connectParams,
             });

@@ -948,9 +948,7 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
             var params: [String: String] = [twimlParamTo: to]
             if let extra = extraParams {
                 for (key, value) in extra {
-                    if key != twimlParamTo {
-                        params[key] = value
-                    }
+                    params[key] = value
                 }
             }
             builder.params = params

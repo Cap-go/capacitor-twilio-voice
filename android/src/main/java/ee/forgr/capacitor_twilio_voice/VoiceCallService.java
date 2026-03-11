@@ -191,9 +191,7 @@ public class VoiceCallService extends Service {
         android.os.Bundle extraParams = intent.getBundleExtra(EXTRA_CALL_PARAMS);
         if (extraParams != null) {
             for (String key : extraParams.keySet()) {
-                if (!"to".equals(key)) {
-                    params.put(key, extraParams.getString(key));
-                }
+                params.put(key, extraParams.getString(key));
             }
         }
 
