@@ -5,6 +5,7 @@ import type { CapacitorTwilioVoicePlugin, CallInvite } from './definitions';
 export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwilioVoicePlugin {
   // Authentication
   async login(_options: { accessToken: string }): Promise<{ success: boolean }> {
+    void _options;
     throw this.unimplemented('Not implemented on web.');
   }
 
@@ -17,28 +18,38 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
   }
 
   // Call Management
-  async makeCall(_options: { to: string }): Promise<{ success: boolean; callSid?: string }> {
+  async makeCall(_options: {
+    to: string;
+    displayName?: string;
+    callerId?: string;
+  }): Promise<{ success: boolean; callSid?: string }> {
+    void _options;
     throw this.unimplemented('Not implemented on web.');
   }
 
   async acceptCall(_options: { callSid: string }): Promise<{ success: boolean }> {
+    void _options;
     throw this.unimplemented('Not implemented on web.');
   }
 
   async rejectCall(_options: { callSid: string }): Promise<{ success: boolean }> {
+    void _options;
     throw this.unimplemented('Not implemented on web.');
   }
 
   async endCall(_options: { callSid?: string }): Promise<{ success: boolean }> {
+    void _options;
     throw this.unimplemented('Not implemented on web.');
   }
 
   // Call Controls
   async muteCall(_options: { muted: boolean; callSid?: string }): Promise<{ success: boolean }> {
+    void _options;
     throw this.unimplemented('Not implemented on web.');
   }
 
   async setSpeaker(_options: { enabled: boolean }): Promise<{ success: boolean }> {
+    void _options;
     throw this.unimplemented('Not implemented on web.');
   }
 

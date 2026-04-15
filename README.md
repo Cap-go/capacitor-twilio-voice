@@ -633,7 +633,7 @@ Check if the user is currently logged in and has a valid access token.
 ### makeCall(...)
 
 ```typescript
-makeCall(options: { to: string; displayName?: string; }) => Promise<{ success: boolean; callSid?: string; }>
+makeCall(options: { to: string; displayName?: string; callerId?: string; }) => Promise<{ success: boolean; callSid?: string; }>
 ```
 
 Initiate an outgoing call to a phone number or client.
@@ -641,9 +641,9 @@ Initiate an outgoing call to a phone number or client.
 The user must be logged in before making a call. The call will be routed
 through your Twilio backend configuration.
 
-| Param         | Type                                               | Description            |
-| ------------- | -------------------------------------------------- | ---------------------- |
-| **`options`** | <code>{ to: string; displayName?: string; }</code> | - Configuration object |
+| Param         | Type                                                                  | Description            |
+| ------------- | --------------------------------------------------------------------- | ---------------------- |
+| **`options`** | <code>{ to: string; displayName?: string; callerId?: string; }</code> | - Configuration object |
 
 **Returns:** <code>Promise&lt;{ success: boolean; callSid?: string; }&gt;</code>
 
