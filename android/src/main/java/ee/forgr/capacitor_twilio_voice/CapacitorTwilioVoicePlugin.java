@@ -240,6 +240,9 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         // Set instance for Firebase messaging service
         instance = this;
 
+        // Pre-resolve main activity for notification intents when app is cold-started
+        resolveMainActivityClass();
+
         // Load stored access token
         SharedPreferences prefs = getSafeContext().getSharedPreferences("CapacitorTwilioVoice", Context.MODE_PRIVATE);
         accessToken = prefs.getString(PREF_ACCESS_TOKEN, null);
@@ -441,6 +444,51 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
 
     public void setMainActivityClass(Class<?> mainActivityClass) {
         this.mainActivityClass = mainActivityClass;
+    }
+
+    private Class<?> resolveMainActivityClass() {
+        if (this.mainActivityClass != null) {
+            return this.mainActivityClass;
+        }
+
+        try {
+            Context context = getSafeContext();
+            Intent launchIntent = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
+            if (launchIntent != null && launchIntent.getComponent() != null) {
+                this.mainActivityClass = Class.forName(launchIntent.getComponent().getClassName());
+                return this.mainActivityClass;
+            } else {
+                Log.w(TAG, "resolveMainActivityClass: launch intent missing component for package " + context.getPackageName());
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to resolve main activity class", e);
+        }
+
+        return null;
+    }
+
+    private Intent createMainActivityIntent() {
+        try {
+            Context context = getSafeContext();
+            Class<?> activityClass = resolveMainActivityClass();
+            if (activityClass != null) {
+                return new Intent(context, activityClass);
+            }
+
+            Intent launchIntent = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
+            if (launchIntent != null) {
+                Intent intent = new Intent(launchIntent);
+                intent.setComponent(launchIntent.getComponent());
+                intent.setPackage(context.getPackageName());
+                return intent;
+            } else {
+                Log.w(TAG, "createMainActivityIntent: no launch intent available for package " + context.getPackageName());
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "createMainActivityIntent: failed to build intent for main activity", e);
+        }
+
+        return null;
     }
 
     private void initializeNotifications() {
@@ -832,20 +880,21 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             return;
         }
 
-        if (mainActivityClass != null) {
-            Context context = getSafeContext();
-            Intent launchIntent = new Intent(context, mainActivityClass);
-            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-            if (pendingPermissionAction == PendingPermissionAction.ACCEPT_CALL && pendingCallSidForPermission != null) {
-                launchIntent.putExtra("AUTO_ACCEPT_CALL", true);
-                launchIntent.putExtra(EXTRA_CALL_SID, pendingCallSidForPermission);
-            }
-            Log.d(TAG, "requestMicrophonePermission: launching activity to request permission");
-            context.startActivity(launchIntent);
-        } else {
+        Intent launchIntent = createMainActivityIntent();
+        if (launchIntent == null) {
             Log.w(TAG, "Unable to request microphone permission - no activity available");
             handlePermissionFailure();
+            return;
         }
+
+        Context context = getSafeContext();
+        launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        if (pendingPermissionAction == PendingPermissionAction.ACCEPT_CALL && pendingCallSidForPermission != null) {
+            launchIntent.putExtra("AUTO_ACCEPT_CALL", true);
+            launchIntent.putExtra(EXTRA_CALL_SID, pendingCallSidForPermission);
+        }
+        Log.d(TAG, "requestMicrophonePermission: launching activity to request permission");
+        context.startActivity(launchIntent);
     }
 
     private void handleMicPermissionResult(Map<String, Boolean> permissions) {
@@ -1616,11 +1665,17 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
 
     private void showIncomingCallNotification(CallInvite callInvite, String callSid, String callerName) {
         try {
+            Intent activityIntent = createMainActivityIntent();
+            if (activityIntent == null) {
+                Log.e(TAG, "Error showing notification: unable to resolve activity intent");
+                return;
+            }
+
             // Create intent for accepting the call
             PendingIntent acceptPendingIntent;
             if (this.bridge == null) {
                 // App NOT running - launch new activity
-                Intent acceptIntent = new Intent(getSafeContext(), mainActivityClass);
+                Intent acceptIntent = new Intent(activityIntent);
                 acceptIntent.setAction(ACTION_ACCEPT_CALL);
                 acceptIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
                 acceptIntent.putExtra("AUTO_ACCEPT_CALL", true);
@@ -1656,7 +1711,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             );
 
             // Create intent for full screen
-            Intent fullScreenIntent = new Intent(getSafeContext(), mainActivityClass);
+            Intent fullScreenIntent = new Intent(activityIntent);
             fullScreenIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
             fullScreenIntent.putExtra("INCOMING_CALL", true);
             fullScreenIntent.putExtra(EXTRA_CALL_SID, callSid);
