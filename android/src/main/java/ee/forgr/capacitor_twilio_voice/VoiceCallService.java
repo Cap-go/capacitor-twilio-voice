@@ -137,6 +137,7 @@ public class VoiceCallService extends Service {
 
         // Clean up audio switch
         if (audioSwitch != null) {
+            deactivateAudioSwitch();
             audioSwitch.stop();
             audioSwitch = null;
         }
@@ -165,6 +166,30 @@ public class VoiceCallService extends Service {
             Log.d(TAG, "Selected audio device: " + selectedDevice);
             return kotlin.Unit.INSTANCE;
         });
+    }
+
+    private void activateAudioSwitch() {
+        if (audioSwitch == null) {
+            return;
+        }
+
+        try {
+            audioSwitch.activate();
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to activate AudioSwitch", e);
+        }
+    }
+
+    private void deactivateAudioSwitch() {
+        if (audioSwitch == null) {
+            return;
+        }
+
+        try {
+            audioSwitch.deactivate();
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to deactivate AudioSwitch", e);
+        }
     }
 
     public void setServiceListener(VoiceCallServiceListener listener) {
@@ -261,6 +286,7 @@ public class VoiceCallService extends Service {
         boolean speakerEnabled = intent.getBooleanExtra(EXTRA_SPEAKER_ENABLED, false);
 
         if (audioSwitch != null) {
+            activateAudioSwitch();
             List<AudioDevice> audioDevices = audioSwitch.getAvailableAudioDevices();
             AudioDevice selectedDevice = null;
 
@@ -405,6 +431,8 @@ public class VoiceCallService extends Service {
             activeCall = call;
             currentCallSid = call.getSid();
 
+            activateAudioSwitch();
+
             // Update notification to show connected state with actions
             updateOngoingCallNotification();
 
@@ -455,6 +483,8 @@ public class VoiceCallService extends Service {
             currentCallSid = null;
             isCallMuted = false;
             isSpeakerEnabled = false;
+
+            deactivateAudioSwitch();
 
             if (serviceListener != null) {
                 serviceListener.onCallDisconnected(call, error);
