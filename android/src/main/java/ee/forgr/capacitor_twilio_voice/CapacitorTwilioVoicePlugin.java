@@ -122,6 +122,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
     private PendingPermissionAction pendingPermissionAction = PendingPermissionAction.NONE;
     private PluginCall pendingOutgoingCall;
     private String pendingOutgoingTo;
+    private String pendingOutgoingCallerId;
     private PluginCall pendingPermissionCall;
     private long permissionRequestTimestamp = 0L;
     private int permissionAttemptCount = 0;
@@ -812,26 +813,29 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         if (to == null) {
             to = ""; // Empty string for echo test
         }
+        String callerId = call.getString("callerId");
 
         if (hasMicrophonePermission()) {
-            startOutgoingCall(call, to);
+            startOutgoingCall(call, to, callerId);
             return;
         }
 
         pendingOutgoingCall = call;
         pendingOutgoingTo = to;
+        pendingOutgoingCallerId = callerId;
         pendingPermissionAction = PendingPermissionAction.OUTGOING_CALL;
         permissionAttemptCount = 0;
         call.setKeepAlive(true);
         requestMicrophonePermission();
     }
 
-    private void startOutgoingCall(PluginCall call, String to) {
-        Log.d(TAG, "startOutgoingCall: to=" + to);
+    private void startOutgoingCall(PluginCall call, String to, String callerId) {
+        Log.d(TAG, "startOutgoingCall: to=" + to + ", callerId=" + callerId);
         // Start call via the foreground service
         Intent serviceIntent = new Intent(getSafeContext(), VoiceCallService.class);
         serviceIntent.setAction(VoiceCallService.ACTION_START_CALL);
         serviceIntent.putExtra(VoiceCallService.EXTRA_CALL_TO, to);
+        serviceIntent.putExtra(VoiceCallService.EXTRA_CALLER_ID, callerId);
         serviceIntent.putExtra(VoiceCallService.EXTRA_ACCESS_TOKEN, accessToken);
 
         try {
@@ -920,10 +924,12 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         if (pendingPermissionAction == PendingPermissionAction.OUTGOING_CALL && pendingOutgoingCall != null) {
             PluginCall call = pendingOutgoingCall;
             String to = pendingOutgoingTo != null ? pendingOutgoingTo : "";
+            String callerId = pendingOutgoingCallerId;
             pendingOutgoingCall = null;
             pendingOutgoingTo = null;
+            pendingOutgoingCallerId = null;
             pendingPermissionAction = PendingPermissionAction.NONE;
-            startOutgoingCall(call, to);
+            startOutgoingCall(call, to, callerId);
             return;
         }
 
@@ -1197,6 +1203,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
     private void clearOutgoingPermissionState() {
         pendingOutgoingCall = null;
         pendingOutgoingTo = null;
+        pendingOutgoingCallerId = null;
         if (pendingPermissionAction == PendingPermissionAction.OUTGOING_CALL) {
             pendingPermissionAction = PendingPermissionAction.NONE;
         }
