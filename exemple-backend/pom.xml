@@ -29,7 +29,7 @@
         <dependency>
             <groupId>com.twilio.sdk</groupId>
             <artifactId>twilio</artifactId>
-            <version>11.3.6</version>
+            <version>11.4.0</version>
         </dependency>
         <dependency>
             <groupId>ch.qos.logback</groupId>
