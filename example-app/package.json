@@ -20,7 +20,7 @@
     "@capacitor/local-notifications": "^7.0.1",
     "@capacitor/push-notifications": "^7.0.2",
     "@capgo/capacitor-twilio-voice": "file:..",
-    "@capgo/native-audio": "^7.3.36",
+    "@capgo/native-audio": "^8.0.0",
     "patch-package": "^8.0.0"
   },
   "devDependencies": {
