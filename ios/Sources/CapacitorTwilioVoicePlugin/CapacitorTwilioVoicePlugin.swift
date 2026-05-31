@@ -117,7 +117,6 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
             try audioSession.setCategory(.playAndRecord,
                                          mode: .voiceChat,
                                          options: [.allowBluetooth, .allowBluetoothA2DP, .allowAirPlay])
-            try audioSession.setActive(true)
             NSLog("Audio session configured successfully")
         } catch {
             NSLog("Failed to configure audio session: \(error.localizedDescription)")
