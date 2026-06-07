@@ -12,7 +12,7 @@
         "@capacitor/push-notifications": "^7.0.2",
         "@capgo/capacitor-twilio-voice": "file:..",
         "@capgo/capacitor-updater": "^8.45.11",
-        "@capgo/native-audio": "^7.3.36",
+        "@capgo/native-audio": "^8.4.2",
         "patch-package": "^8.0.0",
       },
       "devDependencies": {
@@ -57,7 +57,7 @@
 
     "@capgo/capacitor-updater": ["@capgo/capacitor-updater@8.47.10", "", { "peerDependencies": { "@capacitor/core": "^8.0.0" } }, "sha512-T/x2Lu9WXknYzCGLKNv1tVaV+UDqBONFI5I2iXg9I5IOSm7Q60DtHuAWckT1BHzszEZ/XqkMqh89cXhhEesViA=="],
 
-    "@capgo/native-audio": ["@capgo/native-audio@7.6.1", "", { "peerDependencies": { "@capacitor/core": ">=7.0.0" } }, "sha512-CyAkZEjm70gU7A7wsRyuLD1L4zKSSUewtRikg3b10FRET0n0nKFGLjPInnGTt0CXXLG/s/VZWslJDFkx54N6ZQ=="],
+    "@capgo/native-audio": ["@capgo/native-audio@8.4.2", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-YI85cH5IQkiab12QvSozwqq0uuhTqcfsYtrFjC0IQQCIAca7yq6hlG6zxScjr6a8XpQc8xWyyEVWuWxa3lIHPw=="],
 
     "@chevrotain/cst-dts-gen": ["@chevrotain/cst-dts-gen@11.0.3", "", { "dependencies": { "@chevrotain/gast": "11.0.3", "@chevrotain/types": "11.0.3", "lodash-es": "4.17.21" } }, "sha512-BvIKpRLeS/8UbfxXxgC33xOumsacaeCKAjAeLyOn7Pcp95HiRbrpl14S+9vaZLolnbssPIUuiUd8IvgkRyt6NQ=="],
 
