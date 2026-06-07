@@ -8,8 +8,8 @@
         "@capacitor/android": "^8.0.0",
         "@capacitor/core": "^8.0.0",
         "@capacitor/ios": "^8.0.0",
-        "@capacitor/local-notifications": "^7.0.1",
-        "@capacitor/push-notifications": "^7.0.2",
+        "@capacitor/local-notifications": "^8.2.0",
+        "@capacitor/push-notifications": "^8.1.1",
         "@capgo/capacitor-twilio-voice": "file:..",
         "@capgo/capacitor-updater": "^8.45.11",
         "@capgo/native-audio": "^8.4.2",
@@ -49,9 +49,9 @@
 
     "@capacitor/ios": ["@capacitor/ios@8.0.0", "", { "peerDependencies": { "@capacitor/core": "^8.0.0" } }, "sha512-gwSn6X4uHYNHlM8zZmVmM1zjEhexxbHpPSSnH1DZkp8o3zdK/RmH8tmDma+3zPZrhhTSrMC7sT24dKTOvV8www=="],
 
-    "@capacitor/local-notifications": ["@capacitor/local-notifications@7.0.3", "", { "peerDependencies": { "@capacitor/core": ">=7.0.0" } }, "sha512-zVHZk5AYRiBwBDynaD7caPUROozgvwOG0L2SPFw1HBTWCscJvo0fsaE67NWW252jzel3PH0XogglJUYFx/jtHA=="],
+    "@capacitor/local-notifications": ["@capacitor/local-notifications@8.2.0", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-fvLY0w2w4MiX+DD4+Wv4DOwOLdzKZsMDwAcRv/Juudd+QbKbn69s6cM3xVqPwAiDqfnqsY4/S8xtQD6M73wY2A=="],
 
-    "@capacitor/push-notifications": ["@capacitor/push-notifications@7.0.3", "", { "peerDependencies": { "@capacitor/core": ">=7.0.0" } }, "sha512-4qt5dRVBkHzq202NEoj3JC+S+zQCrZ1FJh7sjkICy/i1iEos+VaoB3bie8eWDQ2LTARktB4+k2xkdpu8pcVo/g=="],
+    "@capacitor/push-notifications": ["@capacitor/push-notifications@8.1.1", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-WqzjPKIbYbARMN+GC0XMAJcxJpUUzqgzS/Ny8RODLrro38pQhm3GXYwX2Mwd+LZlLY39rGImkCkrKyQSNfuikA=="],
 
     "@capgo/capacitor-twilio-voice": ["@capgo/capacitor-twilio-voice@file:..", { "devDependencies": { "@capacitor/android": "^7.0.0", "@capacitor/core": "^7.0.0", "@capacitor/docgen": "^0.3.0", "@capacitor/ios": "^7.0.0", "@ionic/eslint-config": "^0.4.0", "@ionic/prettier-config": "^4.0.0", "@ionic/swiftlint-config": "^2.0.0", "eslint": "^8.57.0", "prettier": "^3.4.2", "prettier-plugin-java": "^2.6.6", "rimraf": "^6.0.1", "rollup": "^4.30.1", "swiftlint": "^2.0.0", "twilio-cli": "^6.1.0", "typescript": "~4.1.5" }, "peerDependencies": { "@capacitor/core": ">=7.0.0" } }],
 
