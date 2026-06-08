@@ -1,5 +1,6 @@
 package ee.forgr.capacitor_twilio_voice;
 
+import android.annotation.SuppressLint;
 import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -22,6 +23,7 @@ import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.IBinder;
+import android.os.PowerManager;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.provider.Settings;
@@ -93,6 +95,8 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
     private Call activeCall;
 
     private AudioSwitch audioSwitch;
+    private PowerManager.WakeLock proximityWakeLock;
+    private boolean proximityMonitoringEnabled = false;
 
     private Context injectedContext;
 
@@ -169,6 +173,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         public void onCallDisconnected(Call call, CallException error) {
             activeCall = null;
             activeCalls.remove(call.getSid());
+            setProximityMonitoringEnabled(false);
 
             JSObject data = new JSObject();
             data.put("callSid", call.getSid());
@@ -232,6 +237,39 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
 
     public static CapacitorTwilioVoicePlugin getInstance() {
         return instance;
+    }
+
+    @SuppressLint("WakelockTimeout")
+    private void setProximityMonitoringEnabled(boolean enabled) {
+        if (proximityMonitoringEnabled == enabled) {
+            return;
+        }
+
+        try {
+            PowerManager powerManager = (PowerManager) getSafeContext().getSystemService(Context.POWER_SERVICE);
+            if (powerManager == null || !powerManager.isWakeLockLevelSupported(PowerManager.PROXIMITY_SCREEN_OFF_WAKE_LOCK)) {
+                Log.d(TAG, "Proximity monitoring is not supported on this device");
+                return;
+            }
+
+            if (enabled) {
+                if (proximityWakeLock == null) {
+                    proximityWakeLock =
+                        powerManager.newWakeLock(PowerManager.PROXIMITY_SCREEN_OFF_WAKE_LOCK, TAG + ":proximity");
+                    proximityWakeLock.setReferenceCounted(false);
+                }
+
+                if (!proximityWakeLock.isHeld()) {
+                    proximityWakeLock.acquire();
+                }
+            } else if (proximityWakeLock != null && proximityWakeLock.isHeld()) {
+                proximityWakeLock.release();
+            }
+
+            proximityMonitoringEnabled = enabled;
+        } catch (Exception exception) {
+            Log.w(TAG, "Unable to update proximity monitoring", exception);
+        }
     }
 
     @Override
@@ -394,6 +432,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         // Clean up ringtone and notifications
         stopRingtone();
         dismissIncomingCallNotification();
+        setProximityMonitoringEnabled(false);
 
         // Clear plugin instance
         instance = null;
@@ -744,6 +783,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         callsByUuid.clear();
         activeCallInvites.clear();
         activeCall = null;
+        setProximityMonitoringEnabled(false);
 
         // Deactivate AudioSwitch
         if (audioSwitch != null) {
@@ -1263,6 +1303,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
     @PluginMethod
     public void endCall(PluginCall call) {
         // End call via the foreground service
+        setProximityMonitoringEnabled(false);
         Intent serviceIntent = new Intent(getSafeContext(), VoiceCallService.class);
         serviceIntent.setAction(VoiceCallService.ACTION_END_CALL);
 
@@ -1318,6 +1359,21 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
             Log.e(TAG, "Error setting speaker via service", e);
             call.reject("Failed to set speaker: " + e.getMessage());
         }
+    }
+
+    @PluginMethod
+    public void setProximityMonitoring(PluginCall call) {
+        Boolean enabled = call.getBoolean("enabled");
+        if (enabled == null) {
+            call.reject("enabled parameter is required");
+            return;
+        }
+
+        setProximityMonitoringEnabled(enabled);
+
+        JSObject ret = new JSObject();
+        ret.put("success", true);
+        call.resolve(ret);
     }
 
     @PluginMethod
@@ -1864,6 +1920,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         if (callInvite != null) {
             // Dismiss notification and stop sounds
             dismissIncomingCallNotification();
+            setProximityMonitoringEnabled(false);
 
             callInvite.reject(getSafeContext());
             activeCallInvites.remove(callSid);
