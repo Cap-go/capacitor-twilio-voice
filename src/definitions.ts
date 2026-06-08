@@ -284,6 +284,29 @@ export interface CapacitorTwilioVoicePlugin {
    */
   setSpeaker(options: { enabled: boolean }): Promise<{ success: boolean }>;
 
+  /**
+   * Enable or disable proximity monitoring during a call.
+   *
+   * When enabled, the native layer can turn off the screen while the device is near
+   * the user's face to help prevent accidental taps during voice calls.
+   *
+   * @param options - Configuration object
+   * @param options.enabled - Whether to enable (true) or disable (false) proximity monitoring
+   * @returns Promise that resolves with success status
+   *
+   * @example
+   * ```typescript
+   * await CapacitorTwilioVoice.setProximityMonitoring({
+   *   enabled: true
+   * });
+   *
+   * await CapacitorTwilioVoice.setProximityMonitoring({
+   *   enabled: false
+   * });
+   * ```
+   */
+  setProximityMonitoring(options: { enabled: boolean }): Promise<{ success: boolean }>;
+
   // Call Status
 
   /**

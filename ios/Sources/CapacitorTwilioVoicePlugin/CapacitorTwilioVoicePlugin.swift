@@ -5,6 +5,7 @@ import CallKit
 import TwilioVoice
 import AVFoundation
 import Intents
+import UIKit
 
 let kRegistrationTTLInDays = 365
 let kCachedDeviceToken = "CachedDeviceToken"
@@ -42,6 +43,7 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
         CAPPluginMethod(name: "endCall", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "muteCall", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setSpeaker", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setProximityMonitoring", returnType: CAPPluginReturnPromise),
 
         CAPPluginMethod(name: "getCallStatus", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "checkMicrophonePermission", returnType: CAPPluginReturnPromise),
@@ -62,6 +64,7 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
     private var callKitCompletionCallback: ((Bool) -> Void)?
     private var playCustomRingback = false
     private var ringtonePlayer: AVAudioPlayer?
+    private var proximityMonitoringEnabled = false
     private struct PendingOutgoingCall {
         let to: String
         let completion: (Bool) -> Void
@@ -72,12 +75,25 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
     private var pendingOutgoingCalls: [UUID: PendingOutgoingCall] = [:]
 
     deinit {
+        setProximityMonitoringEnabled(false)
+
         // Remove observers
         NotificationCenter.default.removeObserver(self)
 
         // CallKit has an odd API contract where the developer must call invalidate or the CXProvider is leaked.
         if let provider = callKitProvider {
             provider.invalidate()
+        }
+    }
+
+    private func setProximityMonitoringEnabled(_ enabled: Bool) {
+        guard proximityMonitoringEnabled != enabled else {
+            return
+        }
+
+        proximityMonitoringEnabled = enabled
+        DispatchQueue.main.async {
+            UIDevice.current.isProximityMonitoringEnabled = enabled
         }
     }
 
@@ -331,6 +347,7 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
         activeCalls.removeAll()
         activeCallInvites.removeAll()
         activeCall = nil
+        setProximityMonitoringEnabled(false)
 
         NSLog("Logout completed successfully")
         call.resolve(["success": true])
@@ -535,6 +552,7 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
             return
         }
 
+        setProximityMonitoringEnabled(false)
         call.resolve(["success": true])
     }
 
@@ -569,6 +587,16 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
         }
 
         toggleAudioRoute(toSpeaker: enabled)
+        call.resolve(["success": true])
+    }
+
+    @objc func setProximityMonitoring(_ call: CAPPluginCall) {
+        guard let enabled = call.getBool("enabled") else {
+            call.reject("enabled parameter is required")
+            return
+        }
+
+        setProximityMonitoringEnabled(enabled)
         call.resolve(["success": true])
     }
 
@@ -1098,6 +1126,7 @@ extension CapacitorTwilioVoicePlugin: CallDelegate {
 
         activeCalls.removeValue(forKey: call.uuid!.uuidString)
         userInitiatedDisconnect = false
+        setProximityMonitoringEnabled(false)
 
         if playCustomRingback {
             stopRingback()
