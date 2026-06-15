@@ -1,3 +1,4 @@
+import { CapacitorUpdater } from '@capgo/capacitor-updater';
 import { CapacitorTwilioVoice } from '@capgo/capacitor-twilio-voice';
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
@@ -832,3 +833,9 @@ window.showIncomingCall = (callerName = 'Test Caller') => {
   window.twilioApp?.showIncomingCallScreen(callerName);
 };
 window.hideIncomingCall = () => window.twilioApp?.hideIncomingCallScreen();
+
+if (Capacitor.isNativePlatform()) {
+  CapacitorUpdater.notifyAppReady().catch((error) => {
+    console.error('Capgo notifyAppReady failed', error);
+  });
+}
