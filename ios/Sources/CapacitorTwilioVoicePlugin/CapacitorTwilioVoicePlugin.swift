@@ -1231,6 +1231,8 @@ extension CapacitorTwilioVoicePlugin: CXCallObserverDelegate {
         guard let voipCall = getActiveCall(),
               let voipCallUuid = voipCall.uuid,
               activeCalls[voipCallUuid.uuidString] != nil,
+              call.hasEnded,
+              call.uuid != voipCallUuid,
               callObserver.calls.count == 1,
               voipCall.isOnHold,
               callObserver.calls.first?.uuid == voipCallUuid else {
