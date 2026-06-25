@@ -57,6 +57,7 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
     private var activeCall: Call?
     private var callKitProvider: CXProvider?
     private let callKitCallController = CXCallController()
+    private let callObserver = CXCallObserver()
     private var userInitiatedDisconnect: Bool = false
     private var audioDevice = DefaultAudioDevice()
     private var callKitCompletionCallback: ((Bool) -> Void)?
@@ -97,6 +98,7 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
         setupCallKit()
         setupAudioDevice()
         setupNotifications()
+        callObserver.setDelegate(self, queue: nil)
     }
 
     private func setupCallKit() {
@@ -117,8 +119,7 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
             try audioSession.setCategory(.playAndRecord,
                                          mode: .voiceChat,
                                          options: [.allowBluetooth, .allowBluetoothA2DP, .allowAirPlay])
-            try audioSession.setActive(true)
-            NSLog("Audio session configured successfully")
+            NSLog("Audio session category configured")
         } catch {
             NSLog("Failed to configure audio session: \(error.localizedDescription)")
         }
@@ -151,10 +152,10 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
         NSLog("Media services were reset, reconfiguring audio session")
         setupAudioSession()
 
-        // Re-enable audio device
-        audioDevice.isEnabled = true
+        if let call = getActiveCall(), !call.isOnHold {
+            audioDevice.isEnabled = true
+        }
 
-        // Notify listeners about the reset
         notifyListeners("audioSessionReset", data: nil)
     }
 
@@ -168,27 +169,13 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
         switch type {
         case .began:
             NSLog("Audio session interruption began")
-            audioDevice.isEnabled = false
+            if activeCalls.isEmpty && activeCallInvites.isEmpty {
+                audioDevice.isEnabled = false
+            }
             notifyListeners("audioSessionInterrupted", data: ["type": "began"])
 
         case .ended:
             NSLog("Audio session interruption ended")
-
-            // Check if we should resume
-            if let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt {
-                let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
-                if options.contains(.shouldResume) {
-                    do {
-                        try AVAudioSession.sharedInstance().setActive(true)
-                        audioDevice.isEnabled = true
-                        NSLog("Audio session resumed after interruption")
-                        notifyListeners("audioSessionResumed", data: nil)
-                    } catch {
-                        NSLog("Failed to resume audio session: \(error.localizedDescription)")
-                    }
-                }
-            }
-
             notifyListeners("audioSessionInterrupted", data: ["type": "ended"])
 
         @unknown default:
@@ -708,42 +695,14 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
     private func toggleAudioRoute(toSpeaker: Bool) {
         audioDevice.block = {
             do {
-                let audioSession = AVAudioSession.sharedInstance()
-
-                // Ensure audio session is active before changing routing
-                if !audioSession.isOtherAudioPlaying {
-                    try audioSession.setActive(true)
-                }
-
                 if toSpeaker {
-                    try audioSession.overrideOutputAudioPort(.speaker)
+                    try AVAudioSession.sharedInstance().overrideOutputAudioPort(.speaker)
                 } else {
-                    try audioSession.overrideOutputAudioPort(.none)
+                    try AVAudioSession.sharedInstance().overrideOutputAudioPort(.none)
                 }
-
                 NSLog("Audio route changed to: \(toSpeaker ? "speaker" : "earpiece")")
             } catch {
                 NSLog("Failed to change audio route: \(error.localizedDescription)")
-
-                // Try to recover by reconfiguring the audio session
-                do {
-                    let audioSession = AVAudioSession.sharedInstance()
-                    try audioSession.setCategory(.playAndRecord,
-                                                 mode: .voiceChat,
-                                                 options: [.allowBluetooth, .allowBluetoothA2DP, .allowAirPlay])
-                    try audioSession.setActive(true)
-
-                    // Retry the audio route change
-                    if toSpeaker {
-                        try audioSession.overrideOutputAudioPort(.speaker)
-                    } else {
-                        try audioSession.overrideOutputAudioPort(.none)
-                    }
-
-                    NSLog("Audio route recovered and changed to: \(toSpeaker ? "speaker" : "earpiece")")
-                } catch {
-                    NSLog("Failed to recover audio route: \(error.localizedDescription)")
-                }
             }
         }
         audioDevice.block()
@@ -1131,17 +1090,16 @@ extension CapacitorTwilioVoicePlugin: CXProviderDelegate {
     public func provider(_ provider: CXProvider, didActivate audioSession: AVAudioSession) {
         NSLog("CallKit activated audio session")
 
-        // Configure the audio session for VoIP calls
         do {
             try audioSession.setCategory(.playAndRecord,
                                          mode: .voiceChat,
                                          options: [.allowBluetooth, .allowBluetoothA2DP, .allowAirPlay])
-            audioDevice.isEnabled = true
-            NSLog("Audio session activated and configured for call")
         } catch {
             NSLog("Failed to configure audio session during activation: \(error.localizedDescription)")
-            audioDevice.isEnabled = true // Still try to enable the device
         }
+
+        audioDevice.isEnabled = true
+        NSLog("Audio device enabled after CallKit activation")
     }
 
     public func provider(_ provider: CXProvider, didDeactivate audioSession: AVAudioSession) {
@@ -1262,6 +1220,46 @@ extension CapacitorTwilioVoicePlugin: CXProviderDelegate {
 
     public func provider(_ provider: CXProvider, timedOutPerforming action: CXAction) {
         NSLog("Provider timed out performing action: \(action)")
+    }
+}
+
+
+// MARK: - CXCallObserverDelegate
+
+extension CapacitorTwilioVoicePlugin: CXCallObserverDelegate {
+    public func callObserver(_ callObserver: CXCallObserver, callChanged call: CXCall) {
+        guard let voipCall = getActiveCall(),
+              let voipCallUuid = voipCall.uuid,
+              activeCalls[voipCallUuid.uuidString] != nil,
+              call.hasEnded,
+              call.uuid != voipCallUuid,
+              callObserver.calls.count == 1,
+              voipCall.isOnHold,
+              callObserver.calls.first?.uuid == voipCallUuid else {
+            return
+        }
+
+        NSLog("External call ended, scheduling VoIP call unhold")
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            guard let self = self,
+                  let call = self.getActiveCall(),
+                  call.isOnHold,
+                  let uuid = call.uuid else {
+                return
+            }
+
+            let unholdAction = CXSetHeldCallAction(call: uuid, onHold: false)
+            let transaction = CXTransaction(action: unholdAction)
+
+            self.callKitCallController.request(transaction) { error in
+                if let error = error {
+                    NSLog("Failed to unhold VoIP call after external call ended: \(error.localizedDescription)")
+                } else {
+                    NSLog("Successfully unheld VoIP call after external call ended")
+                }
+            }
+        }
     }
 }
 
