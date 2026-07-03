@@ -4,7 +4,7 @@ import pkg from './package.json';
 
 const config: CapacitorConfig = {
   appId: 'app.capgo.twilio.voice',
-  appName: 'Twilio Voice Example',
+  appName: '@capgo/capacitor-twilio-voice',
   webDir: 'dist',
   plugins: {
     SplashScreen: {
