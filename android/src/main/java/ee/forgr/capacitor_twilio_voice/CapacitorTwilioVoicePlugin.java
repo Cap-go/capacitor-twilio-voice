@@ -1341,6 +1341,30 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
     }
 
     @PluginMethod
+    public void sendDigits(PluginCall call) {
+        String digits = call.getString("digits");
+        if (digits == null) {
+            call.reject("digits parameter is required");
+            return;
+        }
+
+        Intent serviceIntent = new Intent(getSafeContext(), VoiceCallService.class);
+        serviceIntent.setAction(VoiceCallService.ACTION_SEND_DIGITS);
+        serviceIntent.putExtra(VoiceCallService.EXTRA_DIGITS, digits);
+
+        try {
+            getSafeContext().startService(serviceIntent);
+
+            JSObject ret = new JSObject();
+            ret.put("success", true);
+            call.resolve(ret);
+        } catch (Exception e) {
+            Log.e(TAG, "Error sending digits via service", e);
+            call.reject("Failed to send digits: " + e.getMessage());
+        }
+    }
+
+    @PluginMethod
     public void setSpeaker(PluginCall call) {
         boolean enabled = call.getBoolean("enabled", false);
 
