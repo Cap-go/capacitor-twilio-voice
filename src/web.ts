@@ -58,6 +58,11 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
     throw this.unimplemented('Not implemented on web.');
   }
 
+  async sendDigits(_options: { digits: string; callSid?: string }): Promise<void> {
+    void _options;
+    throw this.unimplemented('Not implemented on web.');
+  }
+
   // Call Status
   async getCallStatus(): Promise<{
     hasActiveCall: boolean;

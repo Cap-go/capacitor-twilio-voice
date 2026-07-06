@@ -307,6 +307,16 @@ export interface CapacitorTwilioVoicePlugin {
    */
   setProximityMonitoring(options: { enabled: boolean }): Promise<{ success: boolean }>;
 
+  /**
+   * Send DTMF digits during an active call.
+   *
+   * @param options - Configuration object
+   * @param options.digits - DTMF digits to send (e.g. '1', '2', etc.)
+   * @param options.callSid - Unique identifier of the call (optional, defaults to current active call)
+   * @returns Promise that resolves when digits have been sent
+   */
+  sendDigits(options: { digits: string; callSid?: string }): Promise<void>;
+
   // Call Status
 
   /**

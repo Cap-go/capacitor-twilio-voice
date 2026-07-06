@@ -36,6 +36,7 @@ public class VoiceCallService extends Service {
     public static final String ACTION_END_CALL = "END_CALL";
     public static final String ACTION_MUTE_CALL = "MUTE_CALL";
     public static final String ACTION_SPEAKER_TOGGLE = "SPEAKER_TOGGLE";
+    public static final String ACTION_SEND_DIGITS = "SEND_DIGITS";
 
     // Intent extras
     public static final String EXTRA_CALL_TO = "CALL_TO";
@@ -45,6 +46,7 @@ public class VoiceCallService extends Service {
     public static final String EXTRA_CALL_SID = "CALL_SID";
     public static final String EXTRA_MUTED = "MUTED";
     public static final String EXTRA_SPEAKER_ENABLED = "SPEAKER_ENABLED";
+    public static final String EXTRA_DIGITS = "DIGITS";
 
     private Call activeCall;
     private CallInvite activeCallInvite;
@@ -108,6 +110,9 @@ public class VoiceCallService extends Service {
                     break;
                 case ACTION_SPEAKER_TOGGLE:
                     handleSpeakerToggle(intent);
+                    break;
+                case ACTION_SEND_DIGITS:
+                    handleSendDigits(intent);
                     break;
                 default:
                     Log.w(TAG, "Unknown action: " + action);
@@ -313,6 +318,16 @@ public class VoiceCallService extends Service {
                 isSpeakerEnabled = speakerEnabled;
                 Log.d(TAG, "Audio device changed to: " + selectedDevice.getName());
             }
+        }
+    }
+
+    private void handleSendDigits(Intent intent) {
+        String digits = intent.getStringExtra(EXTRA_DIGITS);
+        if (activeCall != null && digits != null) {
+            Log.d(TAG, "Sending DTMF digits: " + digits);
+            activeCall.sendDigits(digits);
+        } else {
+            Log.w(TAG, "Cannot send digits - activeCall is null or digits are null");
         }
     }
 
