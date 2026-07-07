@@ -1,6 +1,6 @@
 {
   "name": "@capgo/capacitor-twilio-voice",
-  "version": "7.7.8",
+  "version": "7.7.9",
   "description": "Integrates the Twilio Voice SDK into Capacitor",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",
