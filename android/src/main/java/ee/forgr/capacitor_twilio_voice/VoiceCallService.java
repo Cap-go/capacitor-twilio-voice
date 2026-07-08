@@ -282,38 +282,49 @@ public class VoiceCallService extends Service {
         }
     }
 
-    private void handleSpeakerToggle(Intent intent) {
-        boolean speakerEnabled = intent.getBooleanExtra(EXTRA_SPEAKER_ENABLED, false);
-
-        if (audioSwitch != null) {
-            activateAudioSwitch();
-            List<AudioDevice> audioDevices = audioSwitch.getAvailableAudioDevices();
-            AudioDevice selectedDevice = null;
-
-            if (speakerEnabled) {
-                // Find speakerphone
-                for (AudioDevice device : audioDevices) {
-                    if (device instanceof AudioDevice.Speakerphone) {
-                        selectedDevice = device;
-                        break;
-                    }
-                }
-            } else {
-                // Find earpiece or bluetooth
-                for (AudioDevice device : audioDevices) {
-                    if (device instanceof AudioDevice.Earpiece || device instanceof AudioDevice.BluetoothHeadset) {
-                        selectedDevice = device;
-                        break;
-                    }
-                }
+    @Nullable
+    static AudioDevice findPreferredAudioDevice(List<AudioDevice> audioDevices, boolean speakerEnabled) {
+        for (AudioDevice device : audioDevices) {
+            if (speakerEnabled && device instanceof AudioDevice.Speakerphone) {
+                return device;
             }
 
-            if (selectedDevice != null) {
-                audioSwitch.selectDevice(selectedDevice);
-                isSpeakerEnabled = speakerEnabled;
-                Log.d(TAG, "Audio device changed to: " + selectedDevice.getName());
+            if (
+                !speakerEnabled &&
+                (
+                    device instanceof AudioDevice.BluetoothHeadset ||
+                    device instanceof AudioDevice.WiredHeadset ||
+                    device instanceof AudioDevice.Earpiece
+                )
+            ) {
+                return device;
             }
         }
+
+        return null;
+    }
+
+    private void applyPreferredAudioDevice(boolean speakerEnabled) {
+        if (audioSwitch == null) {
+            return;
+        }
+
+        activateAudioSwitch();
+
+        AudioDevice selectedDevice = findPreferredAudioDevice(audioSwitch.getAvailableAudioDevices(), speakerEnabled);
+        if (selectedDevice == null) {
+            Log.w(TAG, "No suitable audio device found for speakerEnabled=" + speakerEnabled);
+            return;
+        }
+
+        audioSwitch.selectDevice(selectedDevice);
+        isSpeakerEnabled = speakerEnabled;
+        Log.d(TAG, "Audio device changed to: " + selectedDevice.getName());
+    }
+
+    private void handleSpeakerToggle(Intent intent) {
+        boolean speakerEnabled = intent.getBooleanExtra(EXTRA_SPEAKER_ENABLED, false);
+        applyPreferredAudioDevice(speakerEnabled);
     }
 
     private Notification createOngoingCallNotification(String contentText, boolean showActions) {
@@ -431,7 +442,7 @@ public class VoiceCallService extends Service {
             activeCall = call;
             currentCallSid = call.getSid();
 
-            activateAudioSwitch();
+            applyPreferredAudioDevice(isSpeakerEnabled);
 
             // Update notification to show connected state with actions
             updateOngoingCallNotification();
@@ -469,6 +480,7 @@ public class VoiceCallService extends Service {
         @Override
         public void onReconnected(Call call) {
             Log.d(TAG, "Call reconnected: " + call.getSid());
+            applyPreferredAudioDevice(isSpeakerEnabled);
 
             if (serviceListener != null) {
                 serviceListener.onCallReconnected(call);
@@ -511,6 +523,7 @@ public class VoiceCallService extends Service {
         @Override
         public void onRinging(Call call) {
             Log.d(TAG, "Call ringing: " + call.getSid());
+            applyPreferredAudioDevice(isSpeakerEnabled);
 
             // Update notification to show ringing state
             Notification notification = createOngoingCallNotification("Ringing...", false);
