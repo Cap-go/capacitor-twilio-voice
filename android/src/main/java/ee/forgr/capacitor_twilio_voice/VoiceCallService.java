@@ -20,6 +20,7 @@ import com.twilio.voice.CallException;
 import com.twilio.voice.CallInvite;
 import com.twilio.voice.ConnectOptions;
 import com.twilio.voice.Voice;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +37,12 @@ public class VoiceCallService extends Service {
     public static final String ACTION_END_CALL = "END_CALL";
     public static final String ACTION_MUTE_CALL = "MUTE_CALL";
     public static final String ACTION_SPEAKER_TOGGLE = "SPEAKER_TOGGLE";
+    public static final String ACTION_SET_AUDIO_OUTPUT = "SET_AUDIO_OUTPUT";
+
+    public static final String AUDIO_OUTPUT_EARPIECE = "earpiece";
+    public static final String AUDIO_OUTPUT_SPEAKER = "speaker";
+    public static final String AUDIO_OUTPUT_BLUETOOTH = "bluetooth";
+    public static final String AUDIO_OUTPUT_WIRED = "wired";
 
     // Intent extras
     public static final String EXTRA_CALL_TO = "CALL_TO";
@@ -45,10 +52,12 @@ public class VoiceCallService extends Service {
     public static final String EXTRA_CALL_SID = "CALL_SID";
     public static final String EXTRA_MUTED = "MUTED";
     public static final String EXTRA_SPEAKER_ENABLED = "SPEAKER_ENABLED";
+    public static final String EXTRA_AUDIO_OUTPUT = "AUDIO_OUTPUT";
 
     private Call activeCall;
     private CallInvite activeCallInvite;
     private AudioSwitch audioSwitch;
+    private AudioDevice selectedAudioDevice;
     private boolean isCallMuted = false;
     private boolean isSpeakerEnabled = false;
     private String currentCallSid;
@@ -109,6 +118,9 @@ public class VoiceCallService extends Service {
                 case ACTION_SPEAKER_TOGGLE:
                     handleSpeakerToggle(intent);
                     break;
+                case ACTION_SET_AUDIO_OUTPUT:
+                    handleSetAudioOutput(intent);
+                    break;
                 default:
                     Log.w(TAG, "Unknown action: " + action);
                     break;
@@ -162,6 +174,7 @@ public class VoiceCallService extends Service {
     private void initializeAudioSwitch() {
         audioSwitch = new AudioSwitch(getApplicationContext());
         audioSwitch.start((audioDevices, selectedDevice) -> {
+            selectedAudioDevice = selectedDevice;
             Log.d(TAG, "Available audio devices: " + audioDevices);
             Log.d(TAG, "Selected audio device: " + selectedDevice);
             return kotlin.Unit.INSTANCE;
@@ -194,6 +207,23 @@ public class VoiceCallService extends Service {
 
     public void setServiceListener(VoiceCallServiceListener listener) {
         this.serviceListener = listener;
+    }
+
+    public List<AudioDevice> getAvailableAudioDevicesSnapshot() {
+        if (audioSwitch == null) {
+            return new ArrayList<>();
+        }
+
+        return new ArrayList<>(audioSwitch.getAvailableAudioDevices());
+    }
+
+    @Nullable
+    public AudioDevice getSelectedAudioDevice() {
+        return selectedAudioDevice;
+    }
+
+    public boolean selectAudioOutput(String output) {
+        return applyAudioOutput(output);
     }
 
     private void handleStartCall(Intent intent) {
@@ -283,6 +313,61 @@ public class VoiceCallService extends Service {
     }
 
     @Nullable
+    static String getAudioOutputType(@Nullable AudioDevice device) {
+        if (device == null) {
+            return null;
+        }
+
+        if (device instanceof AudioDevice.Speakerphone) {
+            return AUDIO_OUTPUT_SPEAKER;
+        }
+        if (device instanceof AudioDevice.BluetoothHeadset) {
+            return AUDIO_OUTPUT_BLUETOOTH;
+        }
+        if (device instanceof AudioDevice.WiredHeadset) {
+            return AUDIO_OUTPUT_WIRED;
+        }
+        if (device instanceof AudioDevice.Earpiece) {
+            return AUDIO_OUTPUT_EARPIECE;
+        }
+
+        return null;
+    }
+
+    static String getAudioOutputLabel(AudioDevice device) {
+        String type = getAudioOutputType(device);
+        if (type == null) {
+            return device.getName();
+        }
+
+        if (AUDIO_OUTPUT_EARPIECE.equals(type)) {
+            return "Earpiece";
+        }
+        if (AUDIO_OUTPUT_SPEAKER.equals(type)) {
+            return "Speaker";
+        }
+        if (AUDIO_OUTPUT_BLUETOOTH.equals(type)) {
+            return device.getName() == null || device.getName().isEmpty() ? "Bluetooth" : device.getName();
+        }
+        if (AUDIO_OUTPUT_WIRED.equals(type)) {
+            return device.getName() == null || device.getName().isEmpty() ? "Headphones" : device.getName();
+        }
+
+        return device.getName();
+    }
+
+    @Nullable
+    static AudioDevice findAudioDeviceByOutput(List<AudioDevice> audioDevices, String output) {
+        for (AudioDevice device : audioDevices) {
+            if (output.equals(getAudioOutputType(device))) {
+                return device;
+            }
+        }
+
+        return null;
+    }
+
+    @Nullable
     static AudioDevice findPreferredAudioDevice(List<AudioDevice> audioDevices, boolean speakerEnabled) {
         for (AudioDevice device : audioDevices) {
             if (speakerEnabled && device instanceof AudioDevice.Speakerphone) {
@@ -318,13 +403,44 @@ public class VoiceCallService extends Service {
         }
 
         audioSwitch.selectDevice(selectedDevice);
+        selectedAudioDevice = selectedDevice;
         isSpeakerEnabled = speakerEnabled;
         Log.d(TAG, "Audio device changed to: " + selectedDevice.getName());
+    }
+
+    private boolean applyAudioOutput(String output) {
+        if (audioSwitch == null) {
+            return false;
+        }
+
+        activateAudioSwitch();
+
+        AudioDevice selectedDevice = findAudioDeviceByOutput(audioSwitch.getAvailableAudioDevices(), output);
+        if (selectedDevice == null) {
+            Log.w(TAG, "No suitable audio device found for output=" + output);
+            return false;
+        }
+
+        audioSwitch.selectDevice(selectedDevice);
+        selectedAudioDevice = selectedDevice;
+        isSpeakerEnabled = AUDIO_OUTPUT_SPEAKER.equals(output);
+        Log.d(TAG, "Audio device changed to: " + selectedDevice.getName());
+        return true;
     }
 
     private void handleSpeakerToggle(Intent intent) {
         boolean speakerEnabled = intent.getBooleanExtra(EXTRA_SPEAKER_ENABLED, false);
         applyPreferredAudioDevice(speakerEnabled);
+    }
+
+    private void handleSetAudioOutput(Intent intent) {
+        String output = intent.getStringExtra(EXTRA_AUDIO_OUTPUT);
+        if (output == null || output.isEmpty()) {
+            Log.w(TAG, "No audio output provided for selection");
+            return;
+        }
+
+        applyAudioOutput(output);
     }
 
     private Notification createOngoingCallNotification(String contentText, boolean showActions) {

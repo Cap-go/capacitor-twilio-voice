@@ -239,6 +239,50 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         return instance;
     }
 
+    private boolean isSupportedAudioOutput(String output) {
+        return
+            VoiceCallService.AUDIO_OUTPUT_EARPIECE.equals(output) ||
+            VoiceCallService.AUDIO_OUTPUT_SPEAKER.equals(output) ||
+            VoiceCallService.AUDIO_OUTPUT_BLUETOOTH.equals(output) ||
+            VoiceCallService.AUDIO_OUTPUT_WIRED.equals(output);
+    }
+
+    private JSArray buildAvailableAudioOutputs() {
+        JSArray outputs = new JSArray();
+        if (voiceCallService == null) {
+            return outputs;
+        }
+
+        List<AudioDevice> devices = voiceCallService.getAvailableAudioDevicesSnapshot();
+        String[] orderedTypes = new String[] {
+            VoiceCallService.AUDIO_OUTPUT_EARPIECE,
+            VoiceCallService.AUDIO_OUTPUT_SPEAKER,
+            VoiceCallService.AUDIO_OUTPUT_BLUETOOTH,
+            VoiceCallService.AUDIO_OUTPUT_WIRED,
+        };
+
+        for (String type : orderedTypes) {
+            AudioDevice device = VoiceCallService.findAudioDeviceByOutput(devices, type);
+            if (device == null) {
+                continue;
+            }
+
+            JSObject output = new JSObject();
+            output.put("type", type);
+            output.put("label", VoiceCallService.getAudioOutputLabel(device));
+            outputs.put(output);
+        }
+
+        return outputs;
+    }
+
+    private void appendAudioOutputStatus(JSObject ret) {
+        String selectedOutput =
+            voiceCallService == null ? null : VoiceCallService.getAudioOutputType(voiceCallService.getSelectedAudioDevice());
+        ret.put("audioOutput", selectedOutput);
+        ret.put("availableAudioOutputs", buildAvailableAudioOutputs());
+    }
+
     @SuppressLint("WakelockTimeout")
     private void setProximityMonitoringEnabled(boolean enabled) {
         if (proximityMonitoringEnabled == enabled) {
@@ -1377,20 +1421,73 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
     public void setSpeaker(PluginCall call) {
         boolean enabled = call.getBoolean("enabled", false);
 
-        // Set speaker via the foreground service
-        Intent serviceIntent = new Intent(getSafeContext(), VoiceCallService.class);
-        serviceIntent.setAction(VoiceCallService.ACTION_SPEAKER_TOGGLE);
-        serviceIntent.putExtra(VoiceCallService.EXTRA_SPEAKER_ENABLED, enabled);
-
         try {
-            getSafeContext().startService(serviceIntent);
+            if (voiceCallService != null) {
+                if (enabled) {
+                    voiceCallService.selectAudioOutput(VoiceCallService.AUDIO_OUTPUT_SPEAKER);
+                } else {
+                    Intent serviceIntent = new Intent(getSafeContext(), VoiceCallService.class);
+                    serviceIntent.setAction(VoiceCallService.ACTION_SPEAKER_TOGGLE);
+                    serviceIntent.putExtra(VoiceCallService.EXTRA_SPEAKER_ENABLED, false);
+                    getSafeContext().startService(serviceIntent);
+                }
+            } else {
+                Intent serviceIntent = new Intent(getSafeContext(), VoiceCallService.class);
+                serviceIntent.setAction(VoiceCallService.ACTION_SPEAKER_TOGGLE);
+                serviceIntent.putExtra(VoiceCallService.EXTRA_SPEAKER_ENABLED, enabled);
+                getSafeContext().startService(serviceIntent);
+            }
 
             JSObject ret = new JSObject();
             ret.put("success", true);
+            appendAudioOutputStatus(ret);
             call.resolve(ret);
         } catch (Exception e) {
             Log.e(TAG, "Error setting speaker via service", e);
             call.reject("Failed to set speaker: " + e.getMessage());
+        }
+    }
+
+    @PluginMethod
+    public void setAudioOutput(PluginCall call) {
+        String output = call.getString("output");
+        if (output == null || output.isEmpty()) {
+            call.reject("output parameter is required");
+            return;
+        }
+
+        if (!isSupportedAudioOutput(output)) {
+            call.reject("Unsupported audio output: " + output);
+            return;
+        }
+
+        try {
+            boolean selected;
+            if (voiceCallService != null) {
+                selected = voiceCallService.selectAudioOutput(output);
+            } else {
+                Intent serviceIntent = new Intent(getSafeContext(), VoiceCallService.class);
+                serviceIntent.setAction(VoiceCallService.ACTION_SET_AUDIO_OUTPUT);
+                serviceIntent.putExtra(VoiceCallService.EXTRA_AUDIO_OUTPUT, output);
+                getSafeContext().startService(serviceIntent);
+                selected = true;
+            }
+
+            if (!selected) {
+                call.reject("Requested audio output is not available");
+                return;
+            }
+
+            JSObject ret = new JSObject();
+            ret.put("success", true);
+            appendAudioOutputStatus(ret);
+            if (voiceCallService == null) {
+                ret.put("audioOutput", output);
+            }
+            call.resolve(ret);
+        } catch (Exception e) {
+            Log.e(TAG, "Error setting audio output", e);
+            call.reject("Failed to set audio output: " + e.getMessage());
         }
     }
 
@@ -1449,6 +1546,7 @@ public class CapacitorTwilioVoicePlugin extends Plugin {
         }
         ret.put("pendingInvites", pendingInvitesArray);
         ret.put("activeCallsCount", activeCalls.size() + callsByUuid.size());
+        appendAudioOutputStatus(ret);
         call.resolve(ret);
     }
 

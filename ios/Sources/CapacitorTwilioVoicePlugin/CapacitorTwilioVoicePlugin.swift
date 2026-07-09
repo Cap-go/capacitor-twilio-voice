@@ -13,6 +13,10 @@ let kCachedBindingDate = "CachedBindingDate"
 let kCachedAccessToken = "CachedAccessToken"
 let twimlParamTo = "to"
 let twimlParamCallerId = "callerId"
+let audioOutputEarpiece = "earpiece"
+let audioOutputSpeaker = "speaker"
+let audioOutputBluetooth = "bluetooth"
+let audioOutputWired = "wired"
 
 public protocol PushKitEventDelegate: AnyObject {
     func credentialsUpdated(credentials: PKPushCredentials)
@@ -44,6 +48,7 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
         CAPPluginMethod(name: "endCall", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "muteCall", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setSpeaker", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setAudioOutput", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setProximityMonitoring", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "sendDigits", returnType: CAPPluginReturnPromise),
 
@@ -147,6 +152,152 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
 
         // Set default audio routing to earpiece (not speaker)
         toggleAudioRoute(toSpeaker: false)
+    }
+
+    private func isBluetoothPort(_ portType: AVAudioSession.Port) -> Bool {
+        portType == .bluetoothA2DP || portType == .bluetoothHFP || portType == .bluetoothLE
+    }
+
+    private func isWiredPort(_ portType: AVAudioSession.Port) -> Bool {
+        portType == .headphones || portType == .headsetMic || portType == .lineOut || portType == .usbAudio
+    }
+
+    private func audioOutputLabel(for portDescription: AVAudioSessionPortDescription?, type: String) -> String {
+        if let name = portDescription?.portName, !name.isEmpty {
+            return name
+        }
+
+        switch type {
+        case audioOutputEarpiece:
+            return "Earpiece"
+        case audioOutputSpeaker:
+            return "Speaker"
+        case audioOutputBluetooth:
+            return "Bluetooth"
+        case audioOutputWired:
+            return "Headphones"
+        default:
+            return "Audio"
+        }
+    }
+
+    private func availableAudioOutputs() -> [[String: Any]] {
+        let audioSession = AVAudioSession.sharedInstance()
+        let availableInputs = audioSession.availableInputs ?? []
+        var outputs: [[String: Any]] = []
+
+        if availableInputs.contains(where: { $0.portType == .builtInMic }) {
+            outputs.append([
+                "type": audioOutputEarpiece,
+                "label": audioOutputLabel(for: nil, type: audioOutputEarpiece),
+            ])
+        }
+
+        outputs.append([
+            "type": audioOutputSpeaker,
+            "label": audioOutputLabel(for: nil, type: audioOutputSpeaker),
+        ])
+
+        if let bluetoothInput = availableInputs.first(where: { isBluetoothPort($0.portType) }) {
+            outputs.append([
+                "type": audioOutputBluetooth,
+                "label": audioOutputLabel(for: bluetoothInput, type: audioOutputBluetooth),
+            ])
+        }
+
+        if let wiredInput = availableInputs.first(where: { isWiredPort($0.portType) }) {
+            outputs.append([
+                "type": audioOutputWired,
+                "label": audioOutputLabel(for: wiredInput, type: audioOutputWired),
+            ])
+        }
+
+        return outputs
+    }
+
+    private func currentAudioOutput() -> String? {
+        guard let output = AVAudioSession.sharedInstance().currentRoute.outputs.first else {
+            return nil
+        }
+
+        if output.portType == .builtInSpeaker {
+            return audioOutputSpeaker
+        }
+
+        if isBluetoothPort(output.portType) {
+            return audioOutputBluetooth
+        }
+
+        if isWiredPort(output.portType) {
+            return audioOutputWired
+        }
+
+        return audioOutputEarpiece
+    }
+
+    private func preferredInput(for output: String, availableInputs: [AVAudioSessionPortDescription]) -> AVAudioSessionPortDescription? {
+        switch output {
+        case audioOutputBluetooth:
+            return availableInputs.first(where: { isBluetoothPort($0.portType) })
+        case audioOutputWired:
+            return availableInputs.first(where: { isWiredPort($0.portType) })
+        case audioOutputEarpiece:
+            return availableInputs.first(where: { $0.portType == .builtInMic })
+        default:
+            return nil
+        }
+    }
+
+    private func applyAudioOutput(_ output: String) throws {
+        let audioSession = AVAudioSession.sharedInstance()
+        let availableInputs = audioSession.availableInputs ?? []
+
+        try audioSession.setCategory(.playAndRecord,
+                                     mode: .voiceChat,
+                                     options: [.allowBluetooth, .allowBluetoothA2DP, .allowAirPlay])
+        try audioSession.setActive(true)
+
+        switch output {
+        case audioOutputSpeaker:
+            try audioSession.setPreferredInput(nil)
+            try audioSession.overrideOutputAudioPort(.speaker)
+        case audioOutputEarpiece:
+            try audioSession.setPreferredInput(preferredInput(for: output, availableInputs: availableInputs))
+            try audioSession.overrideOutputAudioPort(.none)
+        case audioOutputBluetooth, audioOutputWired:
+            guard let selectedInput = preferredInput(for: output, availableInputs: availableInputs) else {
+                throw NSError(
+                    domain: "CapacitorTwilioVoicePlugin",
+                    code: 1,
+                    userInfo: [NSLocalizedDescriptionKey: "Requested audio output is not available."]
+                )
+            }
+            try audioSession.setPreferredInput(selectedInput)
+            try audioSession.overrideOutputAudioPort(.none)
+        default:
+            throw NSError(
+                domain: "CapacitorTwilioVoicePlugin",
+                code: 2,
+                userInfo: [NSLocalizedDescriptionKey: "Unsupported audio output: \(output)"]
+            )
+        }
+    }
+
+    private func applyAudioOutputWithRecovery(_ output: String) throws {
+        do {
+            try applyAudioOutput(output)
+            NSLog("Audio route changed to: \(output)")
+        } catch {
+            NSLog("Failed to change audio route: \(error.localizedDescription)")
+
+            do {
+                try applyAudioOutput(output)
+                NSLog("Audio route recovered and changed to: \(output)")
+            } catch {
+                NSLog("Failed to recover audio route: \(error.localizedDescription)")
+                throw error
+            }
+        }
     }
 
     private func setupNotifications() {
@@ -612,8 +763,34 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
             return
         }
 
-        toggleAudioRoute(toSpeaker: enabled)
-        call.resolve(["success": true])
+        do {
+            try applyAudioOutputWithRecovery(enabled ? audioOutputSpeaker : audioOutputEarpiece)
+            call.resolve([
+                "success": true,
+                "audioOutput": currentAudioOutput() as Any,
+                "availableAudioOutputs": availableAudioOutputs(),
+            ])
+        } catch {
+            call.reject("Failed to set speaker: \(error.localizedDescription)")
+        }
+    }
+
+    @objc func setAudioOutput(_ call: CAPPluginCall) {
+        guard let output = call.getString("output"), !output.isEmpty else {
+            call.reject("output parameter is required")
+            return
+        }
+
+        do {
+            try applyAudioOutputWithRecovery(output)
+            call.resolve([
+                "success": true,
+                "audioOutput": currentAudioOutput() as Any,
+                "availableAudioOutputs": availableAudioOutputs(),
+            ])
+        } catch {
+            call.reject("Failed to set audio output: \(error.localizedDescription)")
+        }
     }
 
     @objc func setProximityMonitoring(_ call: CAPPluginCall) {
@@ -671,6 +848,8 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
             "isMuted": isMuted,
             "callSid": callSid as Any,
             "callState": callState,
+            "audioOutput": currentAudioOutput() as Any,
+            "availableAudioOutputs": availableAudioOutputs(),
             "pendingInvites": pendingInvitesArray,
             "activeCallsCount": activeCalls.count
         ])
@@ -760,44 +939,12 @@ public class CapacitorTwilioVoicePlugin: CAPPlugin, CAPBridgedPlugin, PushKitEve
     }
 
     private func toggleAudioRoute(toSpeaker: Bool) {
+        let output = toSpeaker ? audioOutputSpeaker : audioOutputEarpiece
         audioDevice.block = {
             do {
-                let audioSession = AVAudioSession.sharedInstance()
-
-                // Ensure audio session is active before changing routing
-                if !audioSession.isOtherAudioPlaying {
-                    try audioSession.setActive(true)
-                }
-
-                if toSpeaker {
-                    try audioSession.overrideOutputAudioPort(.speaker)
-                } else {
-                    try audioSession.overrideOutputAudioPort(.none)
-                }
-
-                NSLog("Audio route changed to: \(toSpeaker ? "speaker" : "earpiece")")
+                try self.applyAudioOutputWithRecovery(output)
             } catch {
-                NSLog("Failed to change audio route: \(error.localizedDescription)")
-
-                // Try to recover by reconfiguring the audio session
-                do {
-                    let audioSession = AVAudioSession.sharedInstance()
-                    try audioSession.setCategory(.playAndRecord,
-                                                 mode: .voiceChat,
-                                                 options: [.allowBluetooth, .allowBluetoothA2DP, .allowAirPlay])
-                    try audioSession.setActive(true)
-
-                    // Retry the audio route change
-                    if toSpeaker {
-                        try audioSession.overrideOutputAudioPort(.speaker)
-                    } else {
-                        try audioSession.overrideOutputAudioPort(.none)
-                    }
-
-                    NSLog("Audio route recovered and changed to: \(toSpeaker ? "speaker" : "earpiece")")
-                } catch {
-                    NSLog("Failed to recover audio route: \(error.localizedDescription)")
-                }
+                NSLog("Failed to apply audio route in audio device block: \(error.localizedDescription)")
             }
         }
         audioDevice.block()

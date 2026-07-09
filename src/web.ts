@@ -1,6 +1,6 @@
 import { WebPlugin } from '@capacitor/core';
 
-import type { CapacitorTwilioVoicePlugin, CallInvite } from './definitions';
+import type { AudioOutputOption, AudioOutputType, CapacitorTwilioVoicePlugin, CallInvite } from './definitions';
 
 export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwilioVoicePlugin {
   // Authentication
@@ -53,6 +53,13 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
     throw this.unimplemented('Not implemented on web.');
   }
 
+  async setAudioOutput(_options: {
+    output: AudioOutputType;
+  }): Promise<{ success: boolean; audioOutput: AudioOutputType | null; availableAudioOutputs: AudioOutputOption[] }> {
+    void _options;
+    throw this.unimplemented('Not implemented on web.');
+  }
+
   async setProximityMonitoring(_options: { enabled: boolean }): Promise<{ success: boolean }> {
     void _options;
     throw this.unimplemented('Not implemented on web.');
@@ -70,6 +77,8 @@ export class CapacitorTwilioVoiceWeb extends WebPlugin implements CapacitorTwili
     isMuted: boolean;
     callSid?: string;
     callState?: string;
+    audioOutput?: AudioOutputType | null;
+    availableAudioOutputs: AudioOutputOption[];
     pendingInvites: CallInvite[];
     activeCallsCount: number;
   }> {

@@ -60,6 +60,15 @@ export interface CallInvite {
   customParams: Record<string, string>;
 }
 
+export type AudioOutputType = 'earpiece' | 'speaker' | 'bluetooth' | 'wired';
+
+export interface AudioOutputOption {
+  /** Stable output identifier used by the native plugin. */
+  type: AudioOutputType;
+  /** Human-readable label for the device or route. */
+  label: string;
+}
+
 export interface CapacitorTwilioVoicePlugin {
   // Authentication
 
@@ -281,8 +290,23 @@ export interface CapacitorTwilioVoicePlugin {
    *   enabled: false
    * });
    * ```
-   */
+  */
   setSpeaker(options: { enabled: boolean }): Promise<{ success: boolean }>;
+
+  /**
+   * Explicitly select the active audio output for the current call.
+   *
+   * @param options - Configuration object
+   * @param options.output - Desired audio route (earpiece, speaker, bluetooth, or wired)
+   * @returns Promise that resolves with the selected output and the currently available outputs
+   */
+  setAudioOutput(options: {
+    output: AudioOutputType;
+  }): Promise<{
+    success: boolean;
+    audioOutput: AudioOutputType | null;
+    availableAudioOutputs: AudioOutputOption[];
+  }>;
 
   /**
    * Enable or disable proximity monitoring during a call.
@@ -356,6 +380,10 @@ export interface CapacitorTwilioVoicePlugin {
     callSid?: string;
     /** Current state: 'idle', 'connecting', 'ringing', 'connected', 'reconnecting', 'disconnected', or 'unknown' */
     callState?: string;
+    /** The currently selected audio route, if available */
+    audioOutput?: AudioOutputType | null;
+    /** The audio routes currently exposed by the native layer */
+    availableAudioOutputs: AudioOutputOption[];
     /** Array of pending incoming call invitations */
     pendingInvites: CallInvite[];
     /** Total number of active calls being tracked */
