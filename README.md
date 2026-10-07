@@ -1,12 +1,28 @@
 ## Capacitor Twilio Voice Plugin
-<a href="https://capgo.app/"><img src="https://capgo.app/readme-banner.svg?repo=Cap-go/capacitor-twilio-voice" alt="Capgo - Instant updates for Capacitor" /></a>
+
+Make and receive phone calls in your Capacitor app with the Twilio Voice SDK, using CallKit on iOS and native call notifications on Android.
+
+<a href="https://capgo.app/?ref=plugin_twilio_voice"><img src="https://capgo.app/readme-banner.svg?repo=Cap-go/capacitor-twilio-voice" alt="Capgo - Instant updates for Capacitor" /></a>
 
 <div align="center">
-  <h2><a href="https://capgo.app/?ref=plugin_twilio_voice"> ➡️ Get Instant updates for your App with Capgo</a></h2>
-  <h2><a href="https://capgo.app/consulting/?ref=plugin_twilio_voice"> Missing a feature? We’ll build the plugin for you 💪</a></h2>
+  <p><b>Capgo</b>: open-source live updates for Ionic and Capacitor apps. Ship OTA fixes and features instantly, without waiting for app store review.</p>
+  <h2><a href="https://capgo.app/register/?ref=plugin_twilio_voice">➡️ Get started for free</a></h2>
+  <p>14-day unlimited free trial. No credit card required</p>
+  <p><a href="https://capgo.app/consulting/?ref=plugin_twilio_voice">Missing a feature? We'll build the plugin for you 💪</a></p>
 </div>
 
-A Capacitor plugin for integrating Twilio Voice calling functionality into iOS and Android applications.
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Cap-go/capacitor-twilio-voice/main/assets/github-social-preview.png" alt="@capgo/capacitor-twilio-voice for Capacitor apps" width="300" />
+</p>
+
+## Key features
+
+- **Calls**: `makeCall()`, `acceptCall()`, `rejectCall()` and `endCall()`.
+- **In-call controls**: `muteCall()`, `setSpeaker()` and `getCallStatus()`.
+- **Incoming calls**: push-based call invites with PushKit and CallKit on iOS and Firebase Messaging on Android.
+- **Events**: invite, ringing, connected, disconnected, reconnecting and call quality warnings.
+- **Session**: `login()` with a Twilio access token, `isLoggedIn()` and `logout()`.
+- **Platforms**: iOS and Android. Not available on web. `login()`, `isLoggedIn()` and `getCallStatus()` throw on web.
 
 ## Documentation
 
