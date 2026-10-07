@@ -22,7 +22,7 @@ Make and receive phone calls in your Capacitor app with the Twilio Voice SDK, us
 - **Incoming calls**: push-based call invites with PushKit and CallKit on iOS and Firebase Messaging on Android.
 - **Events**: invite, ringing, connected, disconnected, reconnecting and call quality warnings.
 - **Session**: `login()` with a Twilio access token, `isLoggedIn()` and `logout()`.
-- **Platforms**: iOS and Android. Web only reports login and call status.
+- **Platforms**: iOS and Android. Not available on web. `login()`, `isLoggedIn()` and `getCallStatus()` throw on web.
 
 ## Documentation
 
