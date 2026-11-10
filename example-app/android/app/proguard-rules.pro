@@ -19,3 +19,8 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# MainActivity.onCreate reads Bridge.plugins by reflection to export plugin JS.
+-keepclassmembers class com.getcapacitor.Bridge {
+    *** plugins;
+}
